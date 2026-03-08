@@ -1,0 +1,62 @@
+########~~~~-- Stages --~~~~########
+
+stages:
+  - secure
+  - test
+  - build
+  - deploy
+
+########~~~~-- Variables & defaults --~~~~########
+
+default:
+  image: TODO
+  interruptible: true
+
+########~~~~-- Workflows --~~~~########
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+    on_job_failure: all
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - if: "$CI_COMMIT_TAG"
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+
+########~~~~-- Includes --~~~~########
+
+include:
+  - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/secret-finder/secret-finder@main"
+    inputs:
+      job_name: "find_secrets"
+      stage_config: "secure"
+
+find_secrets:
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+
+########~~~~-- Jobs --~~~~########
+
+analyze:
+  stage: test
+  image:
+    name: "${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/sonarsource/sonar-scanner-cli:latest"
+    entrypoint: [ "" ]
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths: [ .sonar/cache ]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar" # Defines the location of the analysis task cache
+    GIT_DEPTH: 0 # Tells git to fetch all the branches of the project, required by the analysis task
+  script:
+    - git config --global --add safe.directory "/builds/$CI_PROJECT_PATH"
+    - LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+    - if [ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]; then PROJECT_VERSION=$LATEST_TAG; else PROJECT_VERSION=$LATEST_TAG-$CI_MERGE_REQUEST_ID; fi
+    - sonar-scanner -Dsonar.projectVersion=$PROJECT_VERSION
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+  needs:
+    - job: find_secrets
+      optional: true
