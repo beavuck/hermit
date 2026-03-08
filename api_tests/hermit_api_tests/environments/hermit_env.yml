@@ -1,0 +1,5 @@
+name: hermit_env
+color: "#C77A0F"
+variables:
+  - name: TASKFLOW_BASE_URL
+    value: "127.0.0.1:8532"
