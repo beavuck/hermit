@@ -1,0 +1,21 @@
+info:
+  name: delete_project
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "204"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

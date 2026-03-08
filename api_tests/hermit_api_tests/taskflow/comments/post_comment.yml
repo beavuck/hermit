@@ -1,0 +1,43 @@
+info:
+  name: post_comment
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210/tasks/f1e2d3c4-b5a6-7890-1234-567890abcdef/comments"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "body": "oneOf resolution is the tricky part, start there"
+      }
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.id
+      operator: isDefined
+    - expression: res.body.body
+      operator: isDefined
+    - expression: res.body.author
+      operator: isDefined
+    - expression: res.body.author.id
+      operator: isDefined
+    - expression: res.body.author.name
+      operator: isDefined
+    - expression: res.body.createdAt
+      operator: isDefined
+    - expression: res.body.updatedAt
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

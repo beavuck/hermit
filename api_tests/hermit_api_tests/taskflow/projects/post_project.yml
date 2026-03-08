@@ -1,0 +1,45 @@
+info:
+  name: post_project
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{TASKFLOW_BASE_URL}}/projects"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Taskflow API",
+        "description": "OpenAPI mock server written in Rust",
+        "status": "active"
+      }
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.id
+      operator: isDefined
+    - expression: res.body.name
+      operator: isDefined
+    - expression: res.body.createdAt
+      operator: isDefined
+    - expression: res.body.updatedAt
+      operator: isDefined
+    - expression: res.body.owner
+      operator: isDefined
+    - expression: res.body.owner.id
+      operator: isDefined
+    - expression: res.body.owner.name
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

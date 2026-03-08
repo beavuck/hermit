@@ -1,0 +1,39 @@
+info:
+  name: get_comments
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210/tasks/f1e2d3c4-b5a6-7890-1234-567890abcdef/comments"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body
+      operator: isArray
+    - expression: res.body
+      operator: isNotEmpty
+    - expression: res.body[0].id
+      operator: isDefined
+    - expression: res.body[0].body
+      operator: isDefined
+    - expression: res.body[0].author
+      operator: isDefined
+    - expression: res.body[0].author.id
+      operator: isDefined
+    - expression: res.body[0].author.name
+      operator: isDefined
+    - expression: res.body[0].createdAt
+      operator: isDefined
+    - expression: res.body[0].updatedAt
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

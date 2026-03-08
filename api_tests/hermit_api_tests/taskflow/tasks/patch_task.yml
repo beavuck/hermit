@@ -1,0 +1,46 @@
+info:
+  name: patch_task
+  type: http
+  seq: 6
+
+http:
+  method: PATCH
+  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210/tasks/f1e2d3c4-b5a6-7890-1234-567890abcdef"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "status": "in_progress",
+        "priority": "high"
+      }
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.id
+      operator: isDefined
+    - expression: res.body.title
+      operator: isDefined
+    - expression: res.body.type
+      operator: isDefined
+    - expression: res.body.status
+      operator: isDefined
+    - expression: res.body.priority
+      operator: isDefined
+    - expression: res.body.projectId
+      operator: isDefined
+    - expression: res.body.createdAt
+      operator: isDefined
+    - expression: res.body.updatedAt
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
