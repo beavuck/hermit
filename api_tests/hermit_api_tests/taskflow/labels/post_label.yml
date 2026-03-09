@@ -1,20 +1,20 @@
 info:
-  name: post_project
+  name: post_label
   type: http
-  seq: 3
+  seq: 2
 
 http:
   method: POST
-  url: "{{TASKFLOW_BASE_URL}}/projects"
+  url: "{{TASKFLOW_BASE_URL}}/labels"
   headers:
     Content-Type: application/json
   body:
     type: json
     data: |-
       {
-        "name": "{{POST_PROJECT_NAME}}",
-        "description": "{{POST_PROJECT_DESCRIPTION}}",
-        "status": "active"
+        "name": "{{POST_LABEL_NAME}}",
+        "color": "{{POST_LABEL_COLOR}}",
+        "description": "{{POST_LABEL_DESCRIPTION}}"
       }
   auth: inherit
 
@@ -22,25 +22,26 @@ runtime:
   scripts:
     - type: after-response
       code: |-
-        bru.setVar("CREATED_PROJECT_ID", res.body.id);
+        bru.setVar("CREATED_LABEL_ID", res.body.id);
   assertions:
     - expression: res.status
       operator: eq
       value: "201"
     - expression: res.body.id
       operator: isDefined
-    - expression: res.body.name
-      operator: isDefined
     - expression: res.body.createdAt
       operator: isDefined
     - expression: res.body.updatedAt
       operator: isDefined
-    - expression: res.body.owner
-      operator: isDefined
-    - expression: res.body.owner.id
-      operator: isDefined
-    - expression: res.body.owner.name
-      operator: isDefined
+    - expression: res.body.name
+      operator: eq
+      value: "{{POST_LABEL_NAME}}"
+    - expression: res.body.color
+      operator: eq
+      value: "{{POST_LABEL_COLOR}}"
+    - expression: res.body.description
+      operator: eq
+      value: "{{POST_LABEL_DESCRIPTION}}"
 
 settings:
   encodeUrl: true

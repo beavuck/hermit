@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210/tasks"
+  url: "{{TASKFLOW_BASE_URL}}/projects/{{PROJECT_ID}}/tasks"
   auth: inherit
 
 runtime:

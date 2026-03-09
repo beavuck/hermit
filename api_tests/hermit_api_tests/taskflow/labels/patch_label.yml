@@ -1,0 +1,38 @@
+info:
+  name: patch_label
+  type: http
+  seq: 6
+
+http:
+  method: PATCH
+  url: "{{TASKFLOW_BASE_URL}}/labels/{{LABEL_ID}}"
+  body:
+    type: json
+    data: |-
+      {
+        "description": "{{PATCH_LABEL_DESCRIPTION}}"
+      }
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.id
+      operator: isDefined
+    - expression: res.body.name
+      operator: eq
+      value: "{{PUT_LABEL_NAME}}"
+    - expression: res.body.color
+      operator: eq
+      value: "{{PUT_LABEL_COLOR}}"
+    - expression: res.body.description
+      operator: eq
+      value: "{{PATCH_LABEL_DESCRIPTION}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

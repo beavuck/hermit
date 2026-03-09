@@ -32,4 +32,14 @@ upgrade-ci:
 
 pre-commit:
     just lint
+    just lint
     just test
+
+up-major:
+    cargo set-version --bump major
+
+up-minor:
+    cargo set-version --bump minor
+
+up-patch:
+    cargo set-version --bump patch

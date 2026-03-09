@@ -1,11 +1,11 @@
 info:
   name: delete_project
   type: http
-  seq: 4
+  seq: 9
 
 http:
   method: DELETE
-  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210"
+  url: "{{TASKFLOW_BASE_URL}}/projects/{{PROJECT_ID}}"
   auth: inherit
 
 runtime:

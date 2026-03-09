@@ -1,19 +1,17 @@
 info:
-  name: post_task_chore
+  name: put_label
   type: http
-  seq: 4
+  seq: 5
 
 http:
-  method: POST
-  url: "{{TASKFLOW_BASE_URL}}/projects/{{PROJECT_ID}}/tasks"
-  headers:
-    Content-Type: application/json
+  method: PUT
+  url: "{{TASKFLOW_BASE_URL}}/labels/{{LABEL_ID}}"
   body:
     type: json
     data: |-
       {
-        "title": "Update dependencies",
-        "type": "chore"
+        "name": "{{PUT_LABEL_NAME}}",
+        "color": "{{PUT_LABEL_COLOR}}"
       }
   auth: inherit
 
@@ -21,20 +19,21 @@ runtime:
   assertions:
     - expression: res.status
       operator: eq
-      value: "201"
+      value: "200"
     - expression: res.body.id
-      operator: isDefined
-    - expression: res.body.title
-      operator: isDefined
-    - expression: res.body.type
-      operator: eq
-      value: "chore"
-    - expression: res.body.projectId
       operator: isDefined
     - expression: res.body.createdAt
       operator: isDefined
     - expression: res.body.updatedAt
       operator: isDefined
+    - expression: res.body.description
+      operator: isDefined
+    - expression: res.body.name
+      operator: eq
+      value: "{{PUT_LABEL_NAME}}"
+    - expression: res.body.color
+      operator: eq
+      value: "{{PUT_LABEL_COLOR}}"
 
 settings:
   encodeUrl: true

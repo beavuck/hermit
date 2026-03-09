@@ -260,6 +260,113 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ProjectIdParam'
       - $ref: '#/components/parameters/TaskIdParam'
+  /labels:
+    get:
+      tags:
+        - Labels
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelPage'
+          description: Paginated list of labels
+      operationId: listLabels
+      summary: List all labels
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabelCreate'
+        required: true
+      tags:
+        - Labels
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+          description: Created label
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      operationId: createLabel
+      summary: Create a label
+  '/labels/{labelId}':
+    get:
+      tags:
+        - Labels
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+          description: A label
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: getLabel
+      summary: Get a label by ID
+    put:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabelBase'
+        required: true
+      tags:
+        - Labels
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+          description: Replaced label
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      operationId: replaceLabel
+      summary: Replace a label
+    patch:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabelPatch'
+        required: true
+      tags:
+        - Labels
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+          description: Updated label
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      operationId: updateLabel
+      summary: Partially update a label
+    delete:
+      tags:
+        - Labels
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: deleteLabel
+      summary: Delete a label
+    parameters:
+      - $ref: '#/components/parameters/LabelIdParam'
 components:
   schemas:
     ProjectStatus:
@@ -303,15 +410,12 @@ components:
         id:
           format: uuid
           type: string
-          example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
         createdAt:
           format: date-time
           type: string
-          example: '2024-03-15T09:00:00Z'
         updatedAt:
           format: date-time
           type: string
-          example: '2024-06-01T14:32:00Z'
     UserRef:
       required:
         - id
@@ -324,7 +428,7 @@ components:
           example: b5c6d7e8-f9a0-1234-5678-90abcdef1234
         name:
           type: string
-          example: Alexis Dupont
+          example: Alexis
         avatarUrl:
           nullable: true
           format: uri
@@ -583,6 +687,50 @@ components:
         limit:
           type: integer
           example: 20
+    LabelBase:
+      required:
+        - name
+        - color
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+        color:
+          type: string
+          description: Display color for the label
+        description:
+          nullable: true
+          type: string
+    LabelCreate:
+      allOf:
+        - $ref: '#/components/schemas/LabelBase'
+    Label:
+      allOf:
+        - $ref: '#/components/schemas/Entity'
+        - $ref: '#/components/schemas/LabelBase'
+    LabelPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Label'
+    LabelPatch:
+      type: object
+      properties:
+        name:
+          nullable: true
+          type: string
+        color:
+          nullable: true
+          type: string
+        description:
+          nullable: true
+          type: string
     ApiError:
       required:
         - code
@@ -655,6 +803,13 @@ components:
         example: f1e2d3c4-b5a6-7890-1234-567890abcdef
       in: path
       required: true
+    LabelIdParam:
+      name: labelId
+      schema:
+        format: uuid
+        type: string
+      in: path
+      required: true
     PageParam:
       name: page
       schema:
@@ -676,3 +831,4 @@ tags:
   - name: Projects
   - name: Tasks
   - name: Comments
+  - name: Labels

@@ -1,10 +1,10 @@
 info:
-  name: trace_project
+  name: get_project_after_put
   type: http
-  seq: 5
+  seq: 8
 
 http:
-  method: TRACE
+  method: GET
   url: "{{TASKFLOW_BASE_URL}}/projects/{{PROJECT_ID}}"
   auth: inherit
 
@@ -13,6 +13,12 @@ runtime:
     - expression: res.status
       operator: eq
       value: "200"
+    - expression: res.body.name
+      operator: eq
+      value: "{{PUT_PROJECT_NAME}}"
+    - expression: res.body.description
+      operator: eq
+      value: "{{PUT_PROJECT_DESCRIPTION}}"
 
 settings:
   encodeUrl: true

@@ -1,11 +1,11 @@
 info:
-  name: options_projects
+  name: get_label_after_patch
   type: http
-  seq: 1
+  seq: 7
 
 http:
-  method: OPTIONS
-  url: "{{TASKFLOW_BASE_URL}}/projects"
+  method: GET
+  url: "{{TASKFLOW_BASE_URL}}/labels/{{LABEL_ID}}"
   auth: inherit
 
 runtime:
@@ -13,6 +13,9 @@ runtime:
     - expression: res.status
       operator: eq
       value: "200"
+    - expression: res.body.description
+      operator: eq
+      value: "{{PATCH_LABEL_DESCRIPTION}}"
 
 settings:
   encodeUrl: true

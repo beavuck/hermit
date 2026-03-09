@@ -1,0 +1,29 @@
+info:
+  name: get_labels
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{TASKFLOW_BASE_URL}}/labels"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.total
+      operator: isDefined
+    - expression: res.body.page
+      operator: isDefined
+    - expression: res.body.limit
+      operator: isDefined
+    - expression: res.body.items
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

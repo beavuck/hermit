@@ -1,11 +1,11 @@
 info:
-  name: get_project
+  name: get_label
   type: http
-  seq: 6
+  seq: 4
 
 http:
   method: GET
-  url: "{{TASKFLOW_BASE_URL}}/projects/{{PROJECT_ID}}"
+  url: "{{TASKFLOW_BASE_URL}}/labels/{{LABEL_ID}}"
   auth: inherit
 
 runtime:
@@ -15,17 +15,15 @@ runtime:
       value: "200"
     - expression: res.body.id
       operator: isDefined
-    - expression: res.body.name
-      operator: isDefined
     - expression: res.body.createdAt
       operator: isDefined
     - expression: res.body.updatedAt
       operator: isDefined
-    - expression: res.body.owner
+    - expression: res.body.name
       operator: isDefined
-    - expression: res.body.owner.id
+    - expression: res.body.color
       operator: isDefined
-    - expression: res.body.owner.name
+    - expression: res.body.description
       operator: isDefined
 
 settings:

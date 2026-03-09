@@ -209,7 +209,7 @@ fn route_from_schema(
             .map(|key| {
                 (
                     key.clone(),
-                    crate::generator::generate(schema, spec, Some(key)),
+                    crate::resource_generator::generate(schema, spec, Some(key)),
                 )
             })
             .collect();
@@ -226,7 +226,7 @@ fn route_from_schema(
         axum_path: path.to_string(),
         method,
         status_code,
-        body: Some(crate::generator::generate(schema, spec, None)),
+        body: Some(crate::resource_generator::generate(schema, spec, None)),
         discriminator_field: None,
         variants: None,
     }

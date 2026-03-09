@@ -32,6 +32,9 @@ Before taking these actions, STOP and explain the situation to the user, then le
     - Removing unused functions, classes, or files
     - Let the user decide if something is truly unused
 
+- **Debugging loops**
+    - After two failed attempts at the same fix, stop and explain the situation to the user before trying again — don't escalate unilaterally; the root cause is likely in a different layer than where you've been looking
+
 ## Pre-Action Checklist
 
 Before using Edit or Write tools, verify:

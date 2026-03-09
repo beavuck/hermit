@@ -135,12 +135,14 @@ analyze:
 build_hermit:
   extends: .cargo_cache
   stage: build
+  variables:
+    RUSTFLAGS: "-C target-feature=+crt-static"
   script:
-    - cargo build --release
+    - cargo build --release --target x86_64-unknown-linux-musl
   artifacts:
     expire_in: 1 day
     paths:
-      - target/release/hermit
+      - target/x86_64-unknown-linux-musl/release/hermit
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
     - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
@@ -193,7 +195,7 @@ run_api_tests:
   stage: build
   image: node:lts-alpine
   script:
-    - ./target/release/hermit --specs specs_assets/taskflow.openapi.yml &
+    - ./target/x86_64-unknown-linux-musl/release/hermit --specs specs_assets/taskflow.openapi.yml &
     - sleep 1
     - cd api_tests/hermit_api_tests && npx --yes @usebruno/cli run --env hermit_env --bail
   rules:
@@ -216,7 +218,7 @@ release_hermit:
   script:
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        --upload-file target/release/hermit \
+        --upload-file target/x86_64-unknown-linux-musl/release/hermit \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hermit/${CI_COMMIT_TAG}/hermit"
   release:
     name: "$CI_COMMIT_TAG"

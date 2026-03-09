@@ -106,8 +106,10 @@ Response field values are resolved in priority order:
 ## Install
 
 ```bash
-sudo curl -fsSL https://gitlab.com/beavuck-services/hermit/-/releases/permalink/latest/downloads/hermit \
-  -o /usr/local/bin/hermit && sudo chmod +x /usr/local/bin/hermit
+TAG=$(curl -fsSL 'https://gitlab.com/api/v4/projects/beavuck-services/hermit/releases/permalink/latest' | grep -o '"tag_name":"[^"]*"' | cut -d'"' -f4) \
+  && sudo curl -fsSL "https://gitlab.com/api/v4/projects/beavuck-services/hermit/packages/generic/hermit/${TAG}/hermit" \
+     -o /usr/local/bin/hermit \
+  && sudo chmod +x /usr/local/bin/hermit
 ```
 
 Re-run the same command to update to the latest release.
@@ -115,7 +117,7 @@ Re-run the same command to update to the latest release.
 Then run it against your spec:
 
 ```bash
-hermit --specs my-api.openapi.yml
+hermit --specs ~/Documents/dev/hermit/specs_assets/taskflow.openapi.yml
 ```
 
 ## Build and run

@@ -1,0 +1,30 @@
+info:
+  name: get_created_project
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: "{{TASKFLOW_BASE_URL}}/projects/{{CREATED_PROJECT_ID}}"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.id
+      operator: eq
+      value: "{{CREATED_PROJECT_ID}}"
+    - expression: res.body.name
+      operator: eq
+      value: "{{POST_PROJECT_NAME}}"
+    - expression: res.body.description
+      operator: eq
+      value: "{{POST_PROJECT_DESCRIPTION}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

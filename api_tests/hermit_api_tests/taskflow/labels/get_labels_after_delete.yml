@@ -1,0 +1,29 @@
+info:
+  name: get_labels_after_delete
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{TASKFLOW_BASE_URL}}/labels"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const deletedId = bru.getVar("CREATED_LABEL_ID");
+        const ids = res.body.items.map(i => i.id);
+        expect(ids).to.not.include(deletedId, "deleted label should no longer appear in the collection");
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.items
+      operator: isArray
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

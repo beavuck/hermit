@@ -1,11 +1,11 @@
 info:
   name: head_project
   type: http
-  seq: 7
+  seq: 4
 
 http:
   method: HEAD
-  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210"
+  url: "{{TASKFLOW_BASE_URL}}/projects/{{PROJECT_ID}}"
   auth: inherit
 
 runtime:

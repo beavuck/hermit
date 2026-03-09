@@ -1,11 +1,11 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use hermit::{generator, spec};
+use hermit::{resource_generator, spec_parser};
 
 const SPEC_PATH: &str = "specs_assets/taskflow.openapi.yml";
 
 fn bench_generate(c: &mut Criterion) {
-    let root = spec::load(std::path::Path::new(SPEC_PATH));
-    let routes = spec::extract_routes(&root);
+    let root = spec_parser::load(std::path::Path::new(SPEC_PATH));
+    let routes = spec_parser::extract_routes(&root);
 
     let route_with_body = routes
         .iter()
@@ -18,7 +18,7 @@ fn bench_generate(c: &mut Criterion) {
 
     c.bench_function("generator_generate", |b| {
         b.iter(|| {
-            generator::generate(
+            resource_generator::generate(
                 std::hint::black_box(&schema),
                 std::hint::black_box(&root),
                 None,

@@ -1,0 +1,29 @@
+info:
+  name: get_projects_after_delete
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{TASKFLOW_BASE_URL}}/projects"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const deletedId = bru.getVar("PROJECT_ID");
+        const ids = res.body.items.map(i => i.id);
+        expect(ids).to.not.include(deletedId, "deleted project should no longer appear in the collection");
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.items
+      operator: isArray
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

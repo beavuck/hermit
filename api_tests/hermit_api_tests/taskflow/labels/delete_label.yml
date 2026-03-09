@@ -1,18 +1,18 @@
 info:
-  name: options_projects
+  name: delete_label
   type: http
-  seq: 1
+  seq: 8
 
 http:
-  method: OPTIONS
-  url: "{{TASKFLOW_BASE_URL}}/projects"
+  method: DELETE
+  url: "{{TASKFLOW_BASE_URL}}/labels/{{CREATED_LABEL_ID}}"
   auth: inherit
 
 runtime:
   assertions:
     - expression: res.status
       operator: eq
-      value: "200"
+      value: "204"
 
 settings:
   encodeUrl: true

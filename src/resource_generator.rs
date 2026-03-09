@@ -2,7 +2,7 @@ use rand::RngExt;
 use serde_json::Value as JsonValue;
 use yaml_serde::Value as YamlValue;
 
-use crate::spec::{flatten_schema, flatten_schema_forced};
+use crate::spec_parser::{flatten_schema, flatten_schema_forced};
 
 pub fn generate(schema: &YamlValue, root: &YamlValue, forced_variant: Option<&str>) -> JsonValue {
     let flat = match forced_variant {
@@ -63,8 +63,11 @@ fn primitive_fallback(schema: &YamlValue, schema_type: &str) -> JsonValue {
         "string" => {
             let fmt = schema.get("format").and_then(|v| v.as_str()).unwrap_or("");
             let s = if fmt.is_empty() {
-                let idx = rng.random_range(0..RANDOM_WORDS.len());
-                RANDOM_WORDS[idx].to_string()
+                let word_count = rng.random_range(2..=5usize);
+                (0..word_count)
+                    .map(|_| random_word(&mut rng))
+                    .collect::<Vec<_>>()
+                    .join(" ")
             } else {
                 string_for_format(fmt, &mut rng)
             };
@@ -223,6 +226,14 @@ mod tests {
         let root = yaml("{}");
         let result = generate(&yaml("type: string"), &root, None);
         assert!(result.as_str().map(|s| !s.is_empty()).unwrap_or(false));
+    }
+
+    #[test]
+    fn generate_string_without_example_is_a_multi_word_phrase() {
+        let root = yaml("{}");
+        let result = generate(&yaml("type: string"), &root, None);
+        let s = result.as_str().expect("expected a string");
+        assert!(s.contains(' '), "expected a multi-word phrase, got {s:?}");
     }
 
     #[test]

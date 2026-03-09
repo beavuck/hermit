@@ -1,7 +1,7 @@
 info:
   name: get_projects
   type: http
-  seq: 1
+  seq: 2
 
 http:
   method: GET

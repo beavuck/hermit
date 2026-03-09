@@ -3,3 +3,29 @@ color: "#C77A0F"
 variables:
   - name: TASKFLOW_BASE_URL
     value: "127.0.0.1:8532"
+  - name: PROJECT_ID
+    value: "c9d8e7f6-a5b4-3210-fedc-ba9876543210"
+  - name: TASK_ID
+    value: "f1e2d3c4-b5a6-7890-1234-567890abcdef"
+  - name: LABEL_ID
+    value: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+  - name: POST_PROJECT_NAME
+    value: "Taskflow API"
+  - name: POST_PROJECT_DESCRIPTION
+    value: "OpenAPI mock server written in Rust"
+  - name: PUT_PROJECT_NAME
+    value: "Taskflow API v2"
+  - name: PUT_PROJECT_DESCRIPTION
+    value: "Updated via PUT"
+  - name: POST_LABEL_NAME
+    value: "backend"
+  - name: POST_LABEL_COLOR
+    value: "#3b82f6"
+  - name: POST_LABEL_DESCRIPTION
+    value: "Issues related to the backend"
+  - name: PUT_LABEL_NAME
+    value: "frontend"
+  - name: PUT_LABEL_COLOR
+    value: "#f59e0b"
+  - name: PATCH_LABEL_DESCRIPTION
+    value: "All frontend-related issues"
