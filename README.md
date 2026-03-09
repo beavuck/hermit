@@ -3,7 +3,7 @@
 Hermit is a zero-config OpenAPI mock server. Point it at a spec file, and it starts serving schema-accurate responses
 immediately -- no stubs to write, no configuration.
 
-## Status
+## 📊 Status
 
 [![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=beavuck-services_hermit)](https://sonarcloud.io/summary/new_code?id=beavuck-services_hermit)
 
@@ -22,7 +22,7 @@ immediately -- no stubs to write, no configuration.
 
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=beavuck-services_hermit&metric=coverage)](https://sonarcloud.io/summary/new_code?id=beavuck-services_hermit)
 
-## Use cases
+## 📗 Use cases
 
 Hermit is useful whenever you need an API to be available but don't want to run the real backend:
 
@@ -31,7 +31,7 @@ Hermit is useful whenever you need an API to be available but don't want to run 
   external services
 - **Contract validation** -- verify that your OpenAPI spec produces the shapes your consumers actually expect
 
-### How it works
+### 🔍 How it works
 
 ```mermaid
 sequenceDiagram
@@ -53,7 +53,7 @@ sequenceDiagram
 All schema work (ref resolution, composition, value generation) happens once at startup. Requests are served from an
 in-memory map with no I/O.
 
-### Request body echo
+### 👓 Request body echo
 
 For `POST`, `PUT`, and `PATCH` requests, Hermit merges the fields you send into the mock response. This means your code
 sees its own writes reflected back -- the most useful behavior for frontend development:
@@ -74,7 +74,7 @@ curl -s -X POST http://localhost:8532/projects \
 # }
 ```
 
-### Polymorphic responses
+### 🧬 Polymorphic responses
 
 When a `POST` endpoint uses `oneOf` with a discriminator, Hermit inspects the request body to pick the right response
 shape:
@@ -93,7 +93,7 @@ curl -s -X POST http://localhost:8532/projects/abc/tasks \
 # "bug"
 ```
 
-### Response generation
+### 📄 Response generation
 
 Response field values are resolved in priority order:
 
@@ -103,7 +103,7 @@ Response field values are resolved in priority order:
 | 2        | `example` in schema | Field has an explicit example value                                                 |
 | 3        | Random value        | Fallback — random word, number, boolean, or format-aware value (UUID, date-time, …) |
 
-## Install
+## 🛠️ Install
 
 ```bash
 TAG=$(curl -fsSL "https://gitlab.com/api/v4/projects/80082599/releases/permalink/latest" \
@@ -133,13 +133,21 @@ Stop the server with `Ctrl+C`, or if it's running in the background:
 kill $(lsof -ti :8532)
 ```
 
+## 🔒 Privacy
+
+See [PRIVACY.md](PRIVACY.md).
+
+## 📜 License
+
+See [UNLICENSE](UNLICENSE).
+
 ---
 
 _And now some dev stuff_
 
 ---
 
-## Build and run
+## 🛞 Build and run
 
 
 ```bash
@@ -152,7 +160,7 @@ The server listens on port `8532` by default. Override with `--port`:
 cargo run --release -- --port 9000 --specs specs_assets/taskflow.openapi.yml
 ```
 
-## Development setup
+## 🔧 Development setup
 
 Install `just`:
 
@@ -171,7 +179,7 @@ configuration to run these checks automatically on commit.
 
 Explore `justfile` for available commands.
 
-## API tests
+## ✅ API tests
 
 Requires the server to be running. Run with [Bruno](https://www.usebruno.com/):
 
@@ -179,6 +187,6 @@ Requires the server to be running. Run with [Bruno](https://www.usebruno.com/):
 cd api_tests/hermit_api_tests && npx --yes @usebruno/cli run --env hermit_env --reporter-html test_report.html --reporter-json test_report.json
 ```
 
-## Architecture
+## 🏗️ Architecture
 
 See [docs/architecture.md](docs/architecture.md).
