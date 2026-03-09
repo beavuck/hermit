@@ -1,0 +1,21 @@
+info:
+  name: options_projects
+  type: http
+  seq: 5
+
+http:
+  method: OPTIONS
+  url: "{{TASKFLOW_BASE_URL}}/projects"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

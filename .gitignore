@@ -76,7 +76,7 @@ temp/
 # =========================
 # Misc
 # =========================
-CLAUDE.md
+node_modules/
 /api_tests/hermit_api_tests/test_report.html
 /api_tests/hermit_api_tests/test_report.json
-node_modules/
+/coverage/lcov.info

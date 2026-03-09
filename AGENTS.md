@@ -68,6 +68,8 @@ Let the user test each small unit before moving to the next. This allows:
   use comments to explain _what_ is done -- the code should read clearly on its own.
 - Don't repeat yourself. If two bits of code look alike but are bound to evolve in different ways,
   fair enough, but apart from that, duplicating code or logic should be banned.
+- Don't hardcode magic values. If a value has a specific meaning, it should be defined as a constant with a descriptive
+  name.
 - Practice TDD: Write failing tests first. Then write code to make them pass. But don't test for
   specific behavior within a method -- test for the observable effects of that behavior. Input in,
   output out.
@@ -82,3 +84,5 @@ Let the user test each small unit before moving to the next. This allows:
 - Favor immutability.
 - Favor composition over inheritance.
 - Follow Rust conventions and best practices for code structure, project layout, error handling, and performance.
+- When a fix requires increasing complexity, stop and look for an approach that removes the dependency instead of
+  working around it.

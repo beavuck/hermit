@@ -1,0 +1,49 @@
+info:
+  name: put_project
+  type: http
+  seq: 6
+
+http:
+  method: PUT
+  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Taskflow API v2",
+        "description": "Updated via PUT",
+        "status": "active"
+      }
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.id
+      operator: isDefined
+    - expression: res.body.name
+      operator: eq
+      value: "Taskflow API v2"
+    - expression: res.body.description
+      operator: eq
+      value: "Updated via PUT"
+    - expression: res.body.createdAt
+      operator: isDefined
+    - expression: res.body.updatedAt
+      operator: isDefined
+    - expression: res.body.owner
+      operator: isDefined
+    - expression: res.body.owner.id
+      operator: isDefined
+    - expression: res.body.owner.name
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

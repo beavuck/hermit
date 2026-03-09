@@ -6,15 +6,14 @@ info:
 http:
   method: POST
   url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210/tasks"
-  headers:
-    Content-Type: application/json
   body:
     type: json
     data: |-
       {
         "title": "Implement schema-based response generation",
         "type": "feature",
-        "storyPoints": 5
+        "storyPoints": 6,
+        "coreRepo": "IAM"
       }
   auth: inherit
 
@@ -36,6 +35,12 @@ runtime:
       operator: isDefined
     - expression: res.body.updatedAt
       operator: isDefined
+    - expression: res.body.storyPoints
+      operator: eq
+      value: "6"
+    - expression: res.body.coreRepo
+      operator: eq
+      value: IAM
 
 settings:
   encodeUrl: true

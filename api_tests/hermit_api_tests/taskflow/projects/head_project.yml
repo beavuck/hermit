@@ -1,0 +1,21 @@
+info:
+  name: head_project
+  type: http
+  seq: 7
+
+http:
+  method: HEAD
+  url: "{{TASKFLOW_BASE_URL}}/projects/c9d8e7f6-a5b4-3210-fedc-ba9876543210"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

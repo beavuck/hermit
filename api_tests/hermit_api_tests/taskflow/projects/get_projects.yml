@@ -6,8 +6,6 @@ info:
 http:
   method: GET
   url: "{{TASKFLOW_BASE_URL}}/projects"
-  headers:
-    X-Workspace-Id: e3d6f8a2-1c4b-4e9d-b7f0-2a5c8d3e6f91
   auth: inherit
 
 runtime:
