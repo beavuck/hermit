@@ -106,23 +106,41 @@ Response field values are resolved in priority order:
 ## Install
 
 ```bash
-TAG=$(curl -fsSL 'https://gitlab.com/api/v4/projects/beavuck-services/hermit/releases/permalink/latest' | grep -o '"tag_name":"[^"]*"' | cut -d'"' -f4) \
-  && sudo curl -fsSL "https://gitlab.com/api/v4/projects/beavuck-services/hermit/packages/generic/hermit/${TAG}/hermit" \
-     -o /usr/local/bin/hermit \
-  && sudo chmod +x /usr/local/bin/hermit
+TAG=$(curl -fsSL "https://gitlab.com/api/v4/projects/80082599/releases/permalink/latest" \
+  | grep -o '"tag_name":"[^"]*"' | cut -d'"' -f4) \
+&& sudo curl -fsSL "https://gitlab.com/api/v4/projects/80082599/packages/generic/hermit/${TAG}/hermit" \
+  -o /usr/local/bin/hermit \
+&& sudo chmod +x /usr/local/bin/hermit
 ```
 
 Re-run the same command to update to the latest release.
 
-Then run it against your spec:
+Then run it against your spec (replace the path with your actual spec file):
 
 ```bash
 hermit --specs ~/Documents/dev/hermit/specs_assets/taskflow.openapi.yml
 ```
 
+To see what arguments are available, run:
+
+```bash
+hermit --help
+```
+
+Stop the server with `Ctrl+C`, or if it's running in the background:
+
+```bash
+kill $(lsof -ti :8532)
+```
+
+---
+
+_And now some dev stuff_
+
+---
+
 ## Build and run
 
-Replace `specs_assets/taskflow.openapi.yml` with your own spec file:
 
 ```bash
 cargo run --release -- --specs specs_assets/taskflow.openapi.yml
@@ -133,16 +151,6 @@ The server listens on port `8532` by default. Override with `--port`:
 ```bash
 cargo run --release -- --port 9000 --specs specs_assets/taskflow.openapi.yml
 ```
-
-Stop the server with `Ctrl+C`, or if it's running in the background:
-
-```bash
-kill $(lsof -ti :8532)
-```
-
-Hermit reads the spec once at startup and generates all mock responses in memory. Responses reflect the `example` values
-in your spec, with schema-based fallbacks for fields that have none. For `POST`, `PUT`, and `PATCH` requests, fields
-from the request body are merged into the response -- so the caller sees their own values echoed back.
 
 ## Development setup
 
