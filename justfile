@@ -25,6 +25,7 @@ coverage-ci:
     cargo llvm-cov report --lcov --output-path lcov.info --ignore-filename-regex "main\.rs|http_method\.rs"
 
 upgrade-ci:
+    cargo install cargo-edit
     cargo upgrade --verbose --incompatible
     cargo update
     cargo set-version --bump patch
