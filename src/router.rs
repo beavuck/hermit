@@ -372,6 +372,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn options_route_with_204_status_returns_no_content() {
+        let app = build(vec![route(HttpMethod::Options, "/items", 204, None)]);
+        let response = send(
+            app,
+            Request::builder()
+                .method(Method::OPTIONS)
+                .uri("/items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
+    async fn delete_with_non_204_status_returns_body() {
+        let app = build(vec![route(
+            HttpMethod::Delete,
+            "/items/{id}",
+            200,
+            Some(json!({"deleted": true})),
+        )]);
+        let response = send(
+            app,
+            Request::builder()
+                .method(Method::DELETE)
+                .uri("/items/abc")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response_json(response).await["deleted"], json!(true));
+    }
+
+    #[tokio::test]
     async fn unknown_route_returns_404() {
         let app = build(vec![route(HttpMethod::Get, "/items", 200, Some(json!({})))]);
         let response = send(

@@ -278,6 +278,43 @@ mod tests {
         assert_eq!(result[0]["id"], json!("new"));
     }
 
+    // --- CrudStore::default ---
+
+    #[test]
+    fn default_creates_empty_store() {
+        let store = CrudStore::default();
+        assert!(store.collection_items("/anything").is_none());
+    }
+
+    // --- parent_path edge case ---
+
+    #[test]
+    fn seed_item_with_root_level_path_registers_root_as_parent() {
+        let mut store = CrudStore::new();
+        store.seed_item("/item", json!({"id": "item"}));
+        assert!(store.collection_initialized("/"));
+    }
+
+    // --- extract_items_from_mock: None body ---
+
+    #[test]
+    fn seed_collection_with_none_body_initializes_empty_collection() {
+        let mut store = CrudStore::new();
+        seed_collection(&mut store, "/items", &None);
+        assert!(store.collection_initialized("/items"));
+        assert_eq!(store.collection_items("/items").unwrap().len(), 0);
+    }
+
+    // --- build_collection_response: None body ---
+
+    #[test]
+    fn build_collection_response_with_none_mock_returns_bare_array() {
+        let item = json!({"id": "x"});
+        let result = build_collection_response(&None, vec![&item]);
+        assert!(result.is_array());
+        assert_eq!(result[0]["id"], json!("x"));
+    }
+
     // --- new_uuid ---
 
     #[test]

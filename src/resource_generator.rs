@@ -390,6 +390,13 @@ mod tests {
     }
 
     #[test]
+    fn generate_unknown_format_returns_empty_string() {
+        let root = yaml("{}");
+        let result = generate(&yaml("type: string\nformat: unknown-format"), &root, None);
+        assert_eq!(result, json!(""));
+    }
+
+    #[test]
     fn generate_password_format_returns_non_empty_string() {
         let root = yaml("{}");
         let result = generate(&yaml("type: string\nformat: password"), &root, None);
