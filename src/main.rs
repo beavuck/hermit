@@ -1,6 +1,44 @@
 use clap::Parser;
 use hermit::{cli, constants, router, spec_parser};
 
+async fn log_request(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
+    let now = chrono::Local::now();
+    let response = next.run(req).await;
+    println!(
+        "{} {} {} --> {}",
+        now.format("%Y-%m-%d %H:%M:%S%.3f"),
+        method,
+        path,
+        response.status()
+    );
+    response
+}
+
+fn print_banner(port: u16) {
+    println!(
+        r#"
+| |                               | |                                          ,=.
+| |__   ___  __ ___   ___   _  ___| | __                        ,=""""==.__.="  o".___
+| '_ \ / _ \/ _` \ \ / / | | |/ __| |/ /                  ,=.=="                  ___/
+| |_) |  __/ (_| |\ V /| |_| | (__|   <             ,==.,"    ,          , \,===""
+|_.__/ \___|\__,_| \_/  \__,_|\___|_|\_\          <     ,==)  \"'"=._.==)  \
+                                                    `==''    `"           `"
+                   __
+                .-(  )-.
+               (  (  )  )
+              (   (  )   )
+              ..//(o o)\\..                       hermit
+
+ Ready on port {port}
+"#
+    );
+}
+
 #[tokio::main]
 async fn main() {
     let args = cli::Args::parse();
@@ -10,9 +48,11 @@ async fn main() {
     });
     let spec = spec_parser::load(&args.specs);
     let routes = spec_parser::extract_routes(&spec);
-    let app = router::build_with_bounds(routes, args.min_items, args.max_items);
+    let app = router::build_with_bounds(routes, args.min_items, args.max_items)
+        .layer(axum::middleware::from_fn(log_request));
 
     let addr = (constants::BIND_ADDR, args.port);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    print_banner(args.port);
     axum::serve(listener, app).await.unwrap();
 }
