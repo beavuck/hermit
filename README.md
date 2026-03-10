@@ -97,11 +97,11 @@ curl -s -X POST http://localhost:8532/projects/abc/tasks \
 
 Response field values are resolved in priority order:
 
-| Priority | Source              | When                                                                                |
-|----------|---------------------|-------------------------------------------------------------------------------------|
-| 1        | Request body fields | `POST`, `PUT`, `PATCH` — caller's values always win                                 |
-| 2        | `example` in schema | Field has an explicit example value                                                 |
-| 3        | Random value        | Fallback — random word, number, boolean, or format-aware value (UUID, date-time, …) |
+| Priority | Source              | When                                                                                 |
+|----------|---------------------|--------------------------------------------------------------------------------------|
+| 1        | Request body fields | `POST`, `PUT`, `PATCH` -- caller's values always win                                 |
+| 2        | `example` in schema | Field has an explicit example value                                                  |
+| 3        | Random value        | Fallback -- random word, number, boolean, or format-aware value (UUID, date-time, …) |
 
 ## 🛠️ Install
 

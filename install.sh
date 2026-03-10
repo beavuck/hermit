@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-GITLAB_API_URL=https://gitlab.com/api/v4
 PROJECT_ID=80082599
-PROJECT_URL=${GITLAB_API_URL}/projects/${PROJECT_ID}
 PROJECT_NAME=hermit
-PROJECT_TARGET_DIR=/usr/local/bin/${PROJECT_NAME}
 ARTIFACT_NAME=hermit
+
+GITLAB_API_URL=https://gitlab.com/api/v4
+PROJECT_URL=${GITLAB_API_URL}/projects/${PROJECT_ID}
+PROJECT_TARGET_DIR=/usr/local/bin/${PROJECT_NAME}
 
 TAG=$(curl -fsSL "${PROJECT_URL}/releases/permalink/latest" | grep -o '"tag_name":"[^"]*"' | cut -d'"' -f4)
 
