@@ -34,3 +34,7 @@ harness = false
 [[bench]]
 name = "generate_bench"
 harness = false
+
+[[bench]]
+name = "request_bench"
+harness = false

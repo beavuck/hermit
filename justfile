@@ -2,10 +2,10 @@ setup:
     cargo install cargo-llvm-cov critcmp cargo-edit
 
 bench:
-    cargo bench --bench startup_bench --bench generate_bench
+    cargo bench --bench startup_bench --bench generate_bench --bench request_bench
 
 bench-ci:
-    cargo bench --bench startup_bench --bench generate_bench -- --save-baseline change
+    cargo bench --bench startup_bench --bench generate_bench --bench request_bench -- --save-baseline change
 
 test:
     cargo test
