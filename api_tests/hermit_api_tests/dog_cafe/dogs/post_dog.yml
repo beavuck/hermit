@@ -1,0 +1,39 @@
+info:
+  name: post_dog
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{DOG_CAFE_BASE_URL}}/dogs"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "{{POST_DOG_NAME}}",
+        "breed": "Dachshund",
+        "size": "small",
+        "vaccinated": true
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const location = res.headers['location'];
+        bru.setVar("CREATED_DOG_ID", location.split('/').pop());
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.headers['location']
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

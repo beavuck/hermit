@@ -1,6 +1,23 @@
 use clap::Parser;
 use hermit::{cli, constants, router, spec_parser};
 
+#[tokio::main]
+async fn main() {
+    let args = cli::Args::parse();
+    args.validate().unwrap_or_else(|e| {
+        eprintln!("error: {e}");
+        std::process::exit(1);
+    });
+    let routes = spec_parser::load_all(&args.specs);
+    let app = router::build_with_bounds(routes, args.min_items, args.max_items)
+        .layer(axum::middleware::from_fn(log_request));
+
+    let addr = (constants::BIND_ADDR, args.port);
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    print_banner(args.port);
+    axum::serve(listener, app).await.unwrap();
+}
+
 async fn log_request(
     req: axum::extract::Request,
     next: axum::middleware::Next,
@@ -37,22 +54,4 @@ fn print_banner(port: u16) {
  Ready on port {port}
 "#
     );
-}
-
-#[tokio::main]
-async fn main() {
-    let args = cli::Args::parse();
-    args.validate().unwrap_or_else(|e| {
-        eprintln!("error: {e}");
-        std::process::exit(1);
-    });
-    let spec = spec_parser::load(&args.specs);
-    let routes = spec_parser::extract_routes(&spec);
-    let app = router::build_with_bounds(routes, args.min_items, args.max_items)
-        .layer(axum::middleware::from_fn(log_request));
-
-    let addr = (constants::BIND_ADDR, args.port);
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    print_banner(args.port);
-    axum::serve(listener, app).await.unwrap();
 }

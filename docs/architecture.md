@@ -1,37 +1,42 @@
 # Architecture
 
-Hermit is a read-once, serve-many mock server. The spec is parsed at startup, all responses are generated eagerly into
+Hermit is a read-once, serve-many mock server. The specs are parsed at startup, all responses are generated eagerly into
 memory, and the server then handles requests purely by lookup -- no parsing or generation happens at request time.
 
 ## Module structure
 
 ```
 src/
-  main.rs        Entry point: parses args, wires up the pipeline
-  cli.rs         CLI argument definitions (clap)
-  constants.rs   Named constants (default port, bind address, spec glob)
-  spec.rs        Loads the spec, resolves $refs, flattens schemas, extracts routes
-  generator.rs   Generates a serde_json::Value from a resolved schema
-  http_method.rs Classifies which HTTP methods accept a request body
-  router.rs      Builds the axum Router; handles requests
+  main.rs              Entry point: parses args, wires up the pipeline
+  cli.rs               CLI argument definitions (clap)
+  constants.rs         Named constants (default port, bind address)
+  spec_parser.rs       Loads specs, resolves $refs, flattens schemas, extracts routes
+  resource_generator.rs  Generates a serde_json::Value from a resolved schema
+  http_method.rs       Classifies which HTTP methods accept a request body
+  router.rs            Builds the axum Router; handles requests
 ```
 
 ## Startup flow
 
+Multiple spec files are loaded and parsed in parallel, each on its own OS thread. Within each spec, discriminator
+variants are generated in parallel using a Rayon thread pool. Routes from all specs are merged before the server starts.
+
 ```mermaid
 sequenceDiagram
     participant CLI
-    participant spec
-    participant generator
+    participant spec_parser
+    participant resource_generator
     participant router
     participant axum
-    CLI ->> spec: load(path)
-    spec ->> spec: parse YAML
-    spec ->> spec: extract_routes(spec)
-    note over spec, generator: For each (path, method) in spec.paths
-    spec ->> generator: generate(schema, spec, variant?)
-    generator -->> spec: serde_json::Value
-    spec -->> CLI: Vec<RouteConfig>
+    CLI ->> spec_parser: load_all(paths)
+    par for each spec file (std::thread)
+        spec_parser ->> spec_parser: load(path) — read & parse YAML
+        spec_parser ->> spec_parser: extract_routes(spec)
+        note over spec_parser, resource_generator: For each (path, method) in spec.paths
+        spec_parser ->> resource_generator: generate(schema, spec, variant?) — rayon par_iter for discriminator variants
+        resource_generator -->> spec_parser: serde_json::Value
+    end
+    spec_parser -->> CLI: Vec<RouteConfig>
     CLI ->> router: build(routes)
     router -->> CLI: axum::Router
     CLI ->> axum: serve(listener, app)
@@ -40,10 +45,23 @@ sequenceDiagram
 All schema resolution, `$ref` following, and response generation happens during `extract_routes`. By the time the server
 is listening, every route has its response pre-built.
 
+## Concurrency model
+
+| Layer | Mechanism | Purpose |
+|---|---|---|
+| Request handling | Tokio async runtime (multi-threaded) | Concurrent HTTP requests |
+| Spec loading | `std::thread::spawn` + `JoinHandle` | Parallel I/O across spec files |
+| Discriminator variant generation | `rayon::par_iter` | CPU-parallel value generation |
+| Shared state (`CrudStore`) | `Arc<RwLock<...>>` | Multiple readers / exclusive writers |
+
+The `RwLock` on `CrudStore` allows concurrent GET requests to read state simultaneously, while mutating methods (POST,
+PUT, PATCH, DELETE) take an exclusive write lock. PATCH acquires a read lock for the initial fetch and a separate write
+lock for the store update, so unrelated GETs are not blocked during the read phase.
+
 ## Schema resolution
 
-`spec.rs` normalises OpenAPI schemas into a flat `{type, properties}` structure before passing them to the generator.
-The resolution order is:
+`spec_parser.rs` normalises OpenAPI schemas into a flat `{type, properties}` structure before passing them to the
+generator. The resolution order is:
 
 ```mermaid
 flowchart TD
@@ -63,7 +81,7 @@ pre-generating each discriminator variant for POST/PUT/PATCH routes.
 
 ## Response generation
 
-`generator.rs` walks a flattened schema and produces a `serde_json::Value`. Priority order:
+`resource_generator.rs` walks a flattened schema and produces a `serde_json::Value`. Priority order:
 
 | Schema                        | Output                                                |
 |-------------------------------|-------------------------------------------------------|

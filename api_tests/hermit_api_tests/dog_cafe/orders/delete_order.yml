@@ -1,0 +1,21 @@
+info:
+  name: delete_order
+  type: http
+  seq: 5
+
+http:
+  method: DELETE
+  url: "{{DOG_CAFE_BASE_URL}}/orders/{{CREATED_ORDER_ID}}"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "204"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

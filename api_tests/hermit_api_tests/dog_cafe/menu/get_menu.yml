@@ -1,0 +1,33 @@
+info:
+  name: get_menu
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{DOG_CAFE_BASE_URL}}/menu"
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body
+      operator: isArray
+    - expression: res.body
+      operator: isNotEmpty
+    - expression: res.body[0].id
+      operator: isDefined
+    - expression: res.body[0].name
+      operator: isDefined
+    - expression: res.body[0].price
+      operator: isDefined
+    - expression: res.body[0].category
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

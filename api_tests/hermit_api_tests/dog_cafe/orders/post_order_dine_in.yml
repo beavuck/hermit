@@ -1,0 +1,38 @@
+info:
+  name: post_order_dine_in
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{DOG_CAFE_BASE_URL}}/orders"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "type": "dine_in",
+        "dogId": "{{DOG_ID}}",
+        "tableNumber": 7
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const location = res.headers['location'];
+        bru.setVar("CREATED_ORDER_ID", location.split('/').pop());
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.headers['location']
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

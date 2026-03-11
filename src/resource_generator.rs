@@ -1,8 +1,8 @@
+use crate::constants::{BASE64_CHARS, RANDOM_WORDS};
+use crate::spec_parser::{flatten_schema, flatten_schema_forced};
 use rand::RngExt;
 use serde_json::Value as JsonValue;
 use yaml_serde::Value as YamlValue;
-
-use crate::spec_parser::{flatten_schema, flatten_schema_forced};
 
 pub fn generate(schema: &YamlValue, root: &YamlValue, forced_variant: Option<&str>) -> JsonValue {
     let flat = match forced_variant {
@@ -49,13 +49,6 @@ fn generate_array(schema: &YamlValue, root: &YamlValue, forced: Option<&str>) ->
         None => JsonValue::Array(vec![]),
     }
 }
-
-const RANDOM_WORDS: &[&str] = &[
-    "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet",
-    "kilo", "lima", "mike", "november", "oscar", "papa", "quebec", "romeo", "sierra", "tango",
-];
-
-const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 fn primitive_fallback(schema: &YamlValue, schema_type: &str) -> JsonValue {
     let mut rng = rand::rng();

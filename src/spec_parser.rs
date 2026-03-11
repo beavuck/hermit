@@ -1,11 +1,31 @@
 use std::collections::HashMap;
 use yaml_serde::Value;
 
+use rayon::prelude::*;
+
 use crate::http_method::HttpMethod;
 
 pub fn load(path: &std::path::Path) -> Value {
     let text = std::fs::read_to_string(path).expect("spec file not found");
     yaml_serde::from_str(&text).expect("invalid YAML")
+}
+
+pub fn load_all(paths: &[std::path::PathBuf]) -> Vec<RouteConfig> {
+    let handles: Vec<_> = paths
+        .iter()
+        .map(|path| {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                let spec = load(&path);
+                extract_routes(&spec)
+            })
+        })
+        .collect();
+
+    handles
+        .into_iter()
+        .flat_map(|h| h.join().expect("spec loader thread panicked"))
+        .collect()
 }
 
 pub fn resolve_ref<'a>(root: &'a Value, ref_str: &str) -> Option<&'a Value> {
@@ -205,7 +225,7 @@ fn route_from_schema(
         && let Some((disc_field, keys)) = find_discriminator(schema, spec)
     {
         let variants = keys
-            .iter()
+            .par_iter()
             .map(|key| {
                 (
                     key.clone(),
@@ -632,6 +652,13 @@ mod tests {
     fn load_reads_yaml_from_file() {
         let val = load(std::path::Path::new("specs_assets/taskflow.openapi.yml"));
         assert!(val.get("paths").is_some());
+    }
+
+    #[test]
+    fn load_all_returns_routes_from_all_specs_in_parallel() {
+        let path = std::path::PathBuf::from("specs_assets/taskflow.openapi.yml");
+        let routes = load_all(&[path.clone(), path]);
+        assert!(routes.len() >= 2, "expected routes from both specs");
     }
 
     #[test]

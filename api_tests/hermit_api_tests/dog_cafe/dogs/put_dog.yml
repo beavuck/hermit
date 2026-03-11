@@ -1,0 +1,38 @@
+info:
+  name: put_dog
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: "{{DOG_CAFE_BASE_URL}}/dogs/{{DOG_ID}}"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "{{PUT_DOG_NAME}}",
+        "breed": "Dachshund",
+        "size": "medium"
+      }
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.id
+      operator: isDefined
+    - expression: res.body.name
+      operator: eq
+      value: "{{PUT_DOG_NAME}}"
+    - expression: res.body.breed
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

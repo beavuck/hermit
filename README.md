@@ -1,7 +1,7 @@
 # 🦀🐚 Beavuck Hermit
 
-Hermit is a zero-config OpenAPI mock server. Point it at a spec file, and it starts serving schema-accurate responses
-immediately -- no stubs to write, no configuration.
+Hermit is a zero-config OpenAPI mock server. Point it at a spec file, and it starts serving lightning-fast
+schema-accurate responses out of the box -- no stubs to write, no configuration.
 
 ## 📊 Status
 
@@ -38,8 +38,8 @@ sequenceDiagram
     participant Client
     participant Hermit
     participant Spec as OpenAPI Spec
-    Note over Hermit, Spec: Startup -- once
-    Hermit ->> Spec: Read & parse YAML
+    Note over Hermit, Spec: Startup -- once (specs loaded in parallel)
+    Hermit ->> Spec: Read & parse YAML (one thread per spec file)
     Hermit ->> Hermit: Resolve $refs, flatten allOf/oneOf
     Hermit ->> Hermit: Pre-generate mock responses for all routes
     Note over Client, Hermit: Runtime -- per request
@@ -60,7 +60,7 @@ sees its own writes reflected back -- the most useful behavior for frontend deve
 
 ```bash
 # Start Hermit
-hermit --specs my-api.openapi.yml
+hermit --specs my-api.openapi.yml other-api.openapi.yml
 
 # Create a project -- the response reflects the name you sent
 curl -s -X POST http://localhost:8532/projects \
@@ -133,6 +133,12 @@ Then run it against your spec (replace the path with your actual spec file):
 hermit --specs ~/Documents/dev/hermit/specs_assets/taskflow.openapi.yml
 ```
 
+You can load multiple specs at once — Hermit merges their routes and loads them in parallel:
+
+```bash
+hermit --specs ~/Documents/dev/hermit/specs_assets/taskflow.openapi.yml ~/Documents/dev/hermit/specs_assets/dog_cafe.openapi.yml
+```
+
 To see what arguments are available, run:
 
 ```bash
@@ -161,9 +167,14 @@ _And now some dev stuff_
 
 ## 🛞 Build and run
 
-
 ```bash
 cargo run --release -- --specs specs_assets/taskflow.openapi.yml
+```
+
+Load multiple specs in one command:
+
+```bash
+cargo run --release -- --specs specs_assets/taskflow.openapi.yml specs_assets/dog_cafe.openapi.yml
 ```
 
 The server listens on port `8532` by default. Override with `--port`:

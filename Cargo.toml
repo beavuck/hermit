@@ -1,6 +1,6 @@
 [package]
 name = "hermit"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2024"
 license-file = "UNLICENSE"
 homepage = "https://gitlab.com/beavuck-services/hermit"
@@ -15,9 +15,10 @@ include = ["src/**/*", "README.md", "UNLICENSE"]
 tokio = { version = "1.50.0", features = ["macros", "net", "rt-multi-thread", "sync"] }
 axum = "0.8"
 serde_json = "1.0.149"
-yaml_serde = "0.10.3"
+yaml_serde = "0.10.4"
 clap = { version = "4.5.60", features = ["derive"] }
 rand = "0.10.0"
+rayon = "1.11.0"
 chrono = "0.4.44"
 
 [dev-dependencies]

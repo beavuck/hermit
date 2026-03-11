@@ -29,3 +29,15 @@ variables:
     value: "#f59e0b"
   - name: PATCH_LABEL_DESCRIPTION
     value: "All frontend-related issues"
+  - name: DOG_CAFE_BASE_URL
+    value: "127.0.0.1:8532"
+  - name: DOG_ID
+    value: "a1b2c3d4-e5f6-0011-2233-445566778899"
+  - name: MENU_ITEM_ID
+    value: "b2c3d4e5-f6a7-1122-3344-556677889900"
+  - name: ORDER_ID
+    value: "c3d4e5f6-a7b8-2233-4455-667788990011"
+  - name: POST_DOG_NAME
+    value: "Pretzel"
+  - name: PUT_DOG_NAME
+    value: "Brezel"

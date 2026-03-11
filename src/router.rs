@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use axum::{
     Json, Router,
@@ -20,7 +20,7 @@ use crate::spec_parser::RouteConfig;
 #[derive(Clone)]
 pub struct AppState {
     routes: HashMap<String, RouteConfig>,
-    store: Arc<Mutex<CrudStore>>,
+    store: Arc<RwLock<CrudStore>>,
     collection_templates: HashMap<String, Vec<serde_json::Value>>,
     min_items: usize,
     max_items: usize,
@@ -64,7 +64,7 @@ pub fn build_with_bounds(configs: Vec<RouteConfig>, min_items: usize, max_items:
 
     let state = Arc::new(AppState {
         routes: into_state_map(configs),
-        store: Arc::new(Mutex::new(CrudStore::new())),
+        store: Arc::new(RwLock::new(CrudStore::new())),
         collection_templates,
         min_items,
         max_items,
@@ -148,13 +148,13 @@ fn get_item(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Response {
         obj.insert("id".to_string(), serde_json::Value::String(id));
     }
 
-    let mut store = state.store.lock().unwrap();
+    let mut store = state.store.write().unwrap();
     store.seed_item(concrete, fallback);
     json_response(cfg.status_code, store.get_item(concrete).cloned())
 }
 
 fn get_collection(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Response {
-    let mut store = state.store.lock().unwrap();
+    let mut store = state.store.write().unwrap();
     if !store.collection_initialized(concrete) {
         let templates = state
             .collection_templates
@@ -178,7 +178,7 @@ fn get_collection(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Respon
 }
 
 fn delete_item(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Response {
-    state.store.lock().unwrap().delete_item(concrete);
+    state.store.write().unwrap().delete_item(concrete);
     if cfg.status_code == StatusCode::NO_CONTENT.as_u16() {
         StatusCode::NO_CONTENT.into_response()
     } else {
@@ -192,6 +192,8 @@ fn post_item(
     collection: &str,
     request_fields: Option<serde_json::Value>,
 ) -> Response {
+    let location_only = cfg.body.is_none() && cfg.discriminator_field.is_none();
+
     let base = if let (Some(disc_field), Some(variants)) = (&cfg.discriminator_field, &cfg.variants)
     {
         let disc_value = request_fields
@@ -202,6 +204,13 @@ fn post_item(
             .and_then(|d| variants.get(d))
             .or_else(|| variants.values().next())
             .cloned()
+    } else if location_only {
+        let now = chrono::Utc::now().to_rfc3339();
+        Some(serde_json::json!({
+            "id": new_uuid(),
+            "createdAt": now,
+            "updatedAt": now,
+        }))
     } else {
         cfg.body.clone()
     };
@@ -214,9 +223,15 @@ fn post_item(
         .unwrap_or_else(new_uuid);
     let item_path = format!("{}/{}", collection, id);
 
-    let mut store = state.store.lock().unwrap();
+    let mut store = state.store.write().unwrap();
     store.put_item(&item_path, new_item.clone());
-    json_response(cfg.status_code, Some(new_item))
+
+    if location_only {
+        let status = StatusCode::from_u16(cfg.status_code).unwrap_or(StatusCode::CREATED);
+        (status, [(axum::http::header::LOCATION, item_path)]).into_response()
+    } else {
+        json_response(cfg.status_code, Some(new_item))
+    }
 }
 
 fn put_or_patch(
@@ -227,7 +242,7 @@ fn put_or_patch(
     method: &Method,
 ) -> Response {
     let base = if *method == Method::PATCH {
-        let store = state.store.lock().unwrap();
+        let store = state.store.read().unwrap();
         store
             .get_item(concrete)
             .cloned()
@@ -239,7 +254,7 @@ fn put_or_patch(
     let updated = merge(base, request_fields);
     state
         .store
-        .lock()
+        .write()
         .unwrap()
         .put_item(concrete, updated.clone());
     json_response(cfg.status_code, Some(updated))
@@ -627,10 +642,10 @@ mod tests {
         use crate::resource_store::CrudStore;
         use axum::Router;
         use std::collections::HashMap;
-        use std::sync::{Arc, Mutex};
+        use std::sync::{Arc, RwLock};
         let state = Arc::new(AppState {
             routes: HashMap::new(),
-            store: Arc::new(Mutex::new(CrudStore::new())),
+            store: Arc::new(RwLock::new(CrudStore::new())),
             collection_templates: HashMap::new(),
             min_items: DEFAULT_MIN_ITEMS,
             max_items: DEFAULT_MAX_ITEMS,
@@ -656,10 +671,10 @@ mod tests {
         use crate::resource_store::CrudStore;
         use axum::Router;
         use std::collections::HashMap;
-        use std::sync::{Arc, Mutex};
+        use std::sync::{Arc, RwLock};
         let state = Arc::new(AppState {
             routes: HashMap::new(),
-            store: Arc::new(Mutex::new(CrudStore::new())),
+            store: Arc::new(RwLock::new(CrudStore::new())),
             collection_templates: HashMap::new(),
             min_items: DEFAULT_MIN_ITEMS,
             max_items: DEFAULT_MAX_ITEMS,
@@ -726,6 +741,65 @@ mod tests {
         )
         .await;
         assert_eq!(response_json(response).await["id"], json!("my-specific-id"));
+    }
+
+    #[tokio::test]
+    async fn post_with_no_body_returns_201_with_location_header() {
+        let app = build(vec![route(HttpMethod::Post, "/items", 201, None)]);
+        let response = send(
+            app,
+            Request::builder()
+                .method(Method::POST)
+                .uri("/items")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"thing"}"#))
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let location = response
+            .headers()
+            .get("location")
+            .expect("missing Location header");
+        assert!(location.to_str().unwrap().starts_with("/items/"));
+    }
+
+    #[tokio::test]
+    async fn post_with_no_body_is_retrievable_via_get() {
+        let app = build(vec![
+            route(HttpMethod::Post, "/items", 201, None),
+            route(HttpMethod::Get, "/items/{id}", 200, None),
+        ]);
+        let post_response = send(
+            app.clone(),
+            Request::builder()
+                .method(Method::POST)
+                .uri("/items")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"thing"}"#))
+                .unwrap(),
+        )
+        .await;
+        let location = post_response
+            .headers()
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let get_response = send(
+            app,
+            Request::builder()
+                .uri(&location)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(get_response.status(), StatusCode::OK);
+        let body = response_json(get_response).await;
+        assert_eq!(body["name"], json!("thing"));
+        assert!(body["id"].is_string());
+        assert!(body["createdAt"].is_string());
     }
 
     #[tokio::test]

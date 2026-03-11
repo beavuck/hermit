@@ -1,0 +1,32 @@
+info:
+  name: post_order_takeaway
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{DOG_CAFE_BASE_URL}}/orders"
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "type": "takeaway",
+        "dogId": "{{DOG_ID}}"
+      }
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.headers['location']
+      operator: isDefined
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
