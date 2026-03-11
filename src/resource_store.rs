@@ -133,6 +133,23 @@ pub fn extract_items_from_mock(mock_body: &Option<Value>) -> Vec<Value> {
     }
 }
 
+pub fn fill_to_count_with_generator(
+    min: usize,
+    max: usize,
+    generator: impl Fn() -> Value,
+) -> Vec<Value> {
+    let target = rand::rng().random_range(min..=max);
+    (0..target)
+        .map(|_| {
+            let mut item = generator();
+            if let Some(obj) = item.as_object_mut() {
+                obj.insert("id".to_string(), Value::String(new_uuid()));
+            }
+            item
+        })
+        .collect()
+}
+
 pub fn fill_to_count(template_items: Vec<Value>, min: usize, max: usize) -> Vec<Value> {
     if template_items.is_empty() {
         return Vec::new();
@@ -346,6 +363,22 @@ mod tests {
                 result.len()
             );
         }
+    }
+
+    #[test]
+    fn fill_to_count_with_generator_calls_gen_independently_per_item() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+        let counter = Arc::new(AtomicU32::new(0));
+        let c = Arc::clone(&counter);
+        let result = fill_to_count_with_generator(3, 3, move || {
+            let n = c.fetch_add(1, Ordering::Relaxed);
+            json!({"id": "x", "n": n})
+        });
+        assert_eq!(result.len(), 3);
+        let ns: Vec<u64> = result.iter().map(|v| v["n"].as_u64().unwrap()).collect();
+        let unique: std::collections::HashSet<_> = ns.iter().collect();
+        assert_eq!(unique.len(), 3, "expected 3 distinct generated values, got {ns:?}");
     }
 
     #[test]

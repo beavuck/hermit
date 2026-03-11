@@ -1,8 +1,20 @@
-use crate::constants::{BASE64_CHARS, RANDOM_WORDS};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::constants::{BASE64_CHARS, DEFAULT_IGNORE_EXAMPLES, RANDOM_WORDS};
 use crate::spec_parser::{flatten_schema, flatten_schema_forced};
 use rand::RngExt;
 use serde_json::Value as JsonValue;
 use yaml_serde::Value as YamlValue;
+
+static IGNORE_EXAMPLES: AtomicBool = AtomicBool::new(DEFAULT_IGNORE_EXAMPLES);
+
+pub fn set_ignore_examples(val: bool) {
+    IGNORE_EXAMPLES.store(val, Ordering::Relaxed);
+}
+
+pub fn ignore_examples() -> bool {
+    IGNORE_EXAMPLES.load(Ordering::Relaxed)
+}
 
 pub fn generate(schema: &YamlValue, root: &YamlValue, forced_variant: Option<&str>) -> JsonValue {
     let flat = match forced_variant {
@@ -13,7 +25,9 @@ pub fn generate(schema: &YamlValue, root: &YamlValue, forced_variant: Option<&st
 }
 
 fn generate_flat(flat: &YamlValue, root: &YamlValue, forced: Option<&str>) -> JsonValue {
-    if let Some(example) = flat.get("example") {
+    if !IGNORE_EXAMPLES.load(Ordering::Relaxed)
+        && let Some(example) = flat.get("example")
+    {
         return yaml_to_json(example);
     }
 
@@ -144,10 +158,22 @@ fn yaml_to_json(v: &YamlValue) -> JsonValue {
 mod tests {
     use serde_json::json;
 
-    use super::generate;
+    use super::{generate, set_ignore_examples};
 
     fn yaml(s: &str) -> yaml_serde::Value {
         yaml_serde::from_str(s).unwrap()
+    }
+
+    // --- ignore_examples global ---
+
+    #[test]
+    fn generate_ignores_example_when_global_set() {
+        set_ignore_examples(true);
+        let root = yaml("{}");
+        let result = generate(&yaml("type: string\nexample: hello"), &root, None);
+        set_ignore_examples(false);
+        assert!(result.is_string());
+        assert_ne!(result, json!("hello"));
     }
 
     // --- example takes priority ---

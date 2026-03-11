@@ -8,6 +8,7 @@ async fn main() {
         eprintln!("error: {e}");
         std::process::exit(1);
     });
+    hermit::resource_generator::set_ignore_examples(args.ignore_examples);
     let routes = spec_parser::load_all(&args.specs);
     let app = router::build_with_bounds(routes, args.min_items, args.max_items)
         .layer(axum::middleware::from_fn(log_request));

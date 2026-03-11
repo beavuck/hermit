@@ -2,17 +2,24 @@ use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS, DEFAULT_PORT};
 
 #[derive(clap::Parser)]
 pub struct Args {
-    #[arg(long, num_args = 1..)]
-    pub specs: Vec<std::path::PathBuf>,
-
     #[arg(long, default_value_t = DEFAULT_PORT)]
     pub port: u16,
 
+    /// One or more OpenAPI spec files to load. Can be specified multiple times or as a space-separated list.
+    #[arg(long, num_args = 1..)]
+    pub specs: Vec<std::path::PathBuf>,
+
+    /// The minimum number of items to generate for array schemas. Must not be greater than `--max-items`.
     #[arg(long, default_value_t = DEFAULT_MIN_ITEMS)]
     pub min_items: usize,
 
+    /// The maximum number of items to generate for array schemas. Must not be less than `--min-items`.
     #[arg(long, default_value_t = DEFAULT_MAX_ITEMS)]
     pub max_items: usize,
+
+    /// Skip `example` values from the spec and generate random data instead
+    #[arg(long, default_value_t = false)]
+    pub ignore_examples: bool,
 }
 
 impl Args {
@@ -124,6 +131,19 @@ mod tests {
         ])
         .unwrap();
         assert!(args.validate().is_ok());
+    }
+
+    #[test]
+    fn ignore_examples_defaults_to_false() {
+        let args = Args::try_parse_from(["hermit", "--specs", "a.yaml"]).unwrap();
+        assert!(!args.ignore_examples);
+    }
+
+    #[test]
+    fn ignore_examples_flag_can_be_set() {
+        let args =
+            Args::try_parse_from(["hermit", "--specs", "a.yaml", "--ignore-examples"]).unwrap();
+        assert!(args.ignore_examples);
     }
 
     #[test]

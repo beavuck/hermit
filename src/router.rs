@@ -11,9 +11,10 @@ use axum::{
 
 use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS};
 use crate::http_method::HttpMethod;
+use crate::resource_generator::ignore_examples;
 use crate::resource_store::{
-    CrudStore, build_collection_response, extract_items_from_mock, fill_to_count, is_item_pattern,
-    new_uuid,
+    CrudStore, build_collection_response, extract_items_from_mock, fill_to_count,
+    fill_to_count_with_generator, is_item_pattern, new_uuid,
 };
 use crate::spec_parser::RouteConfig;
 
@@ -22,6 +23,7 @@ pub struct AppState {
     routes: HashMap<String, RouteConfig>,
     store: Arc<RwLock<CrudStore>>,
     collection_templates: HashMap<String, Vec<serde_json::Value>>,
+    item_generators: HashMap<String, Arc<dyn Fn() -> serde_json::Value + Send + Sync>>,
     min_items: usize,
     max_items: usize,
 }
@@ -56,9 +58,14 @@ pub fn build_with_bounds(configs: Vec<RouteConfig>, min_items: usize, max_items:
     }
 
     let mut collection_templates: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
+    let mut item_generators: HashMap<String, Arc<dyn Fn() -> serde_json::Value + Send + Sync>> =
+        HashMap::new();
     for cfg in &configs {
         if cfg.method == HttpMethod::Get && !is_item_pattern(&cfg.axum_path) {
             collection_templates.insert(cfg.axum_path.clone(), extract_items_from_mock(&cfg.body));
+            if let Some(generator) = cfg.item_generator.clone() {
+                item_generators.insert(cfg.axum_path.clone(), generator);
+            }
         }
     }
 
@@ -66,6 +73,7 @@ pub fn build_with_bounds(configs: Vec<RouteConfig>, min_items: usize, max_items:
         routes: into_state_map(configs),
         store: Arc::new(RwLock::new(CrudStore::new())),
         collection_templates,
+        item_generators,
         min_items,
         max_items,
     });
@@ -156,12 +164,26 @@ fn get_item(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Response {
 fn get_collection(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Response {
     let mut store = state.store.write().unwrap();
     if !store.collection_initialized(concrete) {
-        let templates = state
-            .collection_templates
-            .get(&cfg.axum_path)
-            .cloned()
-            .unwrap_or_default();
-        let filled = fill_to_count(templates, state.min_items, state.max_items);
+        let filled = if ignore_examples() {
+            if let Some(generator) = state.item_generators.get(&cfg.axum_path) {
+                let generator = Arc::clone(generator);
+                fill_to_count_with_generator(state.min_items, state.max_items, move || generator())
+            } else {
+                let templates = state
+                    .collection_templates
+                    .get(&cfg.axum_path)
+                    .cloned()
+                    .unwrap_or_default();
+                fill_to_count(templates, state.min_items, state.max_items)
+            }
+        } else {
+            let templates = state
+                .collection_templates
+                .get(&cfg.axum_path)
+                .cloned()
+                .unwrap_or_default();
+            fill_to_count(templates, state.min_items, state.max_items)
+        };
         for item in filled {
             let id = item
                 .get("id")
@@ -337,6 +359,7 @@ mod tests {
             body,
             discriminator_field: None,
             variants: None,
+            item_generator: None,
         }
     }
 
@@ -451,6 +474,7 @@ mod tests {
                 ]
                 .into(),
             ),
+            item_generator: None,
         }]);
         let response = send(
             app,
@@ -477,6 +501,7 @@ mod tests {
             body: None,
             discriminator_field: Some("kind".to_string()),
             variants: Some([("a".to_string(), json!({"kind": "a", "fromVariantA": true}))].into()),
+            item_generator: None,
         }]);
         let response = send(
             app,
@@ -501,6 +526,7 @@ mod tests {
             body: None,
             discriminator_field: Some("kind".to_string()),
             variants: Some([("a".to_string(), json!({"kind": "a", "score": 5}))].into()),
+            item_generator: None,
         }]);
         let response = send(
             app,
@@ -647,6 +673,7 @@ mod tests {
             routes: HashMap::new(),
             store: Arc::new(RwLock::new(CrudStore::new())),
             collection_templates: HashMap::new(),
+            item_generators: HashMap::new(),
             min_items: DEFAULT_MIN_ITEMS,
             max_items: DEFAULT_MAX_ITEMS,
         });
@@ -676,6 +703,7 @@ mod tests {
             routes: HashMap::new(),
             store: Arc::new(RwLock::new(CrudStore::new())),
             collection_templates: HashMap::new(),
+            item_generators: HashMap::new(),
             min_items: DEFAULT_MIN_ITEMS,
             max_items: DEFAULT_MAX_ITEMS,
         });

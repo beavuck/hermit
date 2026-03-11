@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use yaml_serde::Value;
 
 use rayon::prelude::*;
@@ -162,9 +163,11 @@ pub struct RouteConfig {
     pub body: Option<serde_json::Value>,
     pub discriminator_field: Option<String>,
     pub variants: Option<HashMap<String, serde_json::Value>>,
+    pub item_generator: Option<Arc<dyn Fn() -> serde_json::Value + Send + Sync>>,
 }
 
 pub fn extract_routes(spec: &Value) -> Vec<RouteConfig> {
+    let spec_arc = Arc::new(spec.clone());
     let Some(paths) = spec.get("paths").and_then(|v| v.as_mapping()) else {
         return Vec::new();
     };
@@ -177,7 +180,7 @@ pub fn extract_routes(spec: &Value) -> Vec<RouteConfig> {
         for &method in HttpMethod::ALL {
             if let Some(route) = path_item
                 .get(method.as_str())
-                .and_then(|op| route_for_operation(path_str, method, op, spec))
+                .and_then(|op| route_for_operation(path_str, method, op, spec, &spec_arc))
             {
                 routes.push(route);
             }
@@ -191,6 +194,7 @@ fn route_for_operation(
     method: HttpMethod,
     operation: &Value,
     spec: &Value,
+    spec_arc: &Arc<Value>,
 ) -> Option<RouteConfig> {
     let responses = operation.get("responses")?;
     let (status_code, response) = first_success_response(responses);
@@ -202,7 +206,7 @@ fn route_for_operation(
     };
 
     Some(match schema {
-        Some(s) => route_from_schema(path, method, status_code, s, spec),
+        Some(s) => route_from_schema(path, method, status_code, s, spec, spec_arc),
         None => RouteConfig {
             axum_path: path.to_string(),
             method,
@@ -210,6 +214,7 @@ fn route_for_operation(
             body: None,
             discriminator_field: None,
             variants: None,
+            item_generator: None,
         },
     })
 }
@@ -220,6 +225,7 @@ fn route_from_schema(
     status_code: u16,
     schema: &Value,
     spec: &Value,
+    spec_arc: &Arc<Value>,
 ) -> RouteConfig {
     if method.uses_request_body()
         && let Some((disc_field, keys)) = find_discriminator(schema, spec)
@@ -240,8 +246,10 @@ fn route_from_schema(
             body: None,
             discriminator_field: Some(disc_field),
             variants: Some(variants),
+            item_generator: None,
         };
     }
+    let item_generator = build_item_generator(schema, spec, spec_arc);
     RouteConfig {
         axum_path: path.to_string(),
         method,
@@ -249,7 +257,37 @@ fn route_from_schema(
         body: Some(crate::resource_generator::generate(schema, spec, None)),
         discriminator_field: None,
         variants: None,
+        item_generator,
     }
+}
+
+fn build_item_generator(
+    response_schema: &Value,
+    root: &Value,
+    spec_arc: &Arc<Value>,
+) -> Option<Arc<dyn Fn() -> serde_json::Value + Send + Sync>> {
+    let item_schema = extract_item_schema(response_schema, root)?;
+    let spec_for_gen = Arc::clone(spec_arc);
+    Some(Arc::new(move || {
+        crate::resource_generator::generate(&item_schema, &spec_for_gen, None)
+    }))
+}
+
+fn extract_item_schema(response_schema: &Value, root: &Value) -> Option<Value> {
+    let flat = flatten_schema(response_schema, root);
+    // Direct array response
+    if flat.get("type").and_then(|t| t.as_str()) == Some("array") {
+        return flat.get("items").cloned();
+    }
+    // Envelope object with an array property
+    flat.get("properties")
+        .and_then(|p| p.as_mapping())
+        .and_then(|m| {
+            m.values()
+                .find(|v| v.get("type").and_then(|t| t.as_str()) == Some("array"))
+        })
+        .and_then(|arr_schema| arr_schema.get("items"))
+        .cloned()
 }
 
 const NO_BODY_STATUS: u16 = 204;

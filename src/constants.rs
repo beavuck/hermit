@@ -2,6 +2,7 @@ pub const DEFAULT_PORT: u16 = 8532;
 pub const BIND_ADDR: &str = "0.0.0.0";
 pub const DEFAULT_MIN_ITEMS: usize = 1;
 pub const DEFAULT_MAX_ITEMS: usize = 20;
+pub const DEFAULT_IGNORE_EXAMPLES: bool = false;
 
 pub const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
