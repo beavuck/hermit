@@ -367,8 +367,8 @@ mod tests {
 
     #[test]
     fn fill_to_count_with_generator_calls_gen_independently_per_item() {
-        use std::sync::atomic::{AtomicU32, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicU32, Ordering};
         let counter = Arc::new(AtomicU32::new(0));
         let c = Arc::clone(&counter);
         let result = fill_to_count_with_generator(3, 3, move || {
@@ -378,7 +378,11 @@ mod tests {
         assert_eq!(result.len(), 3);
         let ns: Vec<u64> = result.iter().map(|v| v["n"].as_u64().unwrap()).collect();
         let unique: std::collections::HashSet<_> = ns.iter().collect();
-        assert_eq!(unique.len(), 3, "expected 3 distinct generated values, got {ns:?}");
+        assert_eq!(
+            unique.len(),
+            3,
+            "expected 3 distinct generated values, got {ns:?}"
+        );
     }
 
     #[test]

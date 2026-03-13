@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use clap::Parser;
 use hermit::{cli, constants, router, spec_parser};
 
