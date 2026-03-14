@@ -7,6 +7,9 @@ Don't make a show of being skeptical either, just act with a critical mindset.
 
 When in doubt, ask for clarification rather than making assumptions.
 
+Never ask the user to share secrets, tokens, passwords, or credentials — instead, show the command with a placeholder
+(e.g. `<token>`) and let them fill it in themselves.
+
 ## Critical Rules - Get Approval First
 
 Before taking these actions, STOP and explain the situation to the user, then let them decide:

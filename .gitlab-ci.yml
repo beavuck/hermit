@@ -139,8 +139,8 @@ build_hermit:
   script:
     - apk add --no-cache rustup
     - rustup-init -y
-    - rustup target add x86_64-unknown-linux-musl || true
-    - cargo build --release --target x86_64-unknown-linux-musl
+    - cargo install just
+    - just build-release
   artifacts:
     expire_in: 1 day
     paths:

@@ -113,7 +113,7 @@ Fields marked `readOnly: true` in the schema are never overridden by request bod
 ### Quick install
 
 ```bash
-curl -fsSL https://gitlab.com/beavuck-services/hermit/-/raw/main/install.sh | sh
+curl -fsSL https://gitlab.com/beavuck-services/hermit/-/raw/main/scripts/install.sh | sh
 ```
 
 ### Manual install
