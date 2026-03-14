@@ -30,7 +30,7 @@ variables:
   - name: PATCH_LABEL_DESCRIPTION
     value: "All frontend-related issues"
   - name: DOG_CAFE_BASE_URL
-    value: "127.0.0.1:8532"
+    value: "127.0.0.1:8532/api/dog-cafe"
   - name: DOG_ID
     value: "a1b2c3d4-e5f6-0011-2233-445566778899"
   - name: MENU_ITEM_ID

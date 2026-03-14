@@ -33,7 +33,8 @@ Before taking these actions, STOP and explain the situation to the user, then le
     - Let the user decide if something is truly unused
 
 - **Debugging loops**
-    - After two failed attempts at the same fix, stop and explain the situation to the user before trying again — don't escalate unilaterally; the root cause is likely in a different layer than where you've been looking
+    - After two failed attempts at the same fix, stop and explain the situation to the user before trying again — don't
+      escalate unilaterally; the root cause is likely in a different layer than where you've been looking
 
 ## Pre-Action Checklist
 
@@ -61,6 +62,8 @@ Let the user test each small unit before moving to the next. This allows:
 
 ## Coding style and practices
 
+- Avoid boolean parameters — they signal a function has more than one responsibility; offer the user a few options
+  instead, and let the user give an open answer in case none of your options are chosen.
 - Practice SOLID
     - S: Single Responsibility Principle (each class, each method, should have one reason to change)
     - O: Open/Closed Principle (classes should be open for extension but closed for modification)

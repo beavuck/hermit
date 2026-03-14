@@ -1,9 +1,11 @@
-openapi: 3.1.1
+openapi: 3.2.0
 info:
   title: Dog Café API
   version: 1.0.0
-  description: >
+  description: |
     A café that welcomes dogs. Used alongside taskflow.openapi.yml to demonstrate multi-spec loading.
+servers:
+  - url: /api/dog-cafe
 paths:
   /dogs:
     get:
@@ -31,17 +33,17 @@ paths:
         - Dogs
       responses:
         '201':
-          description: Registered dog
           headers:
             Location:
-              description: URL of the registered dog
               schema:
-                type: string
                 format: uri
+                type: string
                 example: /dogs/a1b2c3d4-e5f6-0011-2233-445566778899
+              description: URL of the registered dog
+          description: Registered dog
       operationId: registerDog
       summary: Register a dog
-  '/dogs/{dogId}':
+  /dogs/{dogId}:
     get:
       tags:
         - Dogs
@@ -103,7 +105,7 @@ paths:
           description: List of menu items
       operationId: listMenuItems
       summary: List all menu items
-  '/menu/{menuItemId}':
+  /menu/{menuItemId}:
     get:
       tags:
         - Menu
@@ -146,17 +148,17 @@ paths:
         - Orders
       responses:
         '201':
-          description: Created order
           headers:
             Location:
-              description: URL of the created order
               schema:
-                type: string
                 format: uri
+                type: string
                 example: /orders/c3d4e5f6-a7b8-2233-4455-667788990011
+              description: URL of the created order
+          description: Created order
       operationId: createOrder
       summary: Place an order
-  '/orders/{orderId}':
+  /orders/{orderId}:
     get:
       tags:
         - Orders

@@ -61,7 +61,10 @@ lock for the store update, so unrelated GETs are not blocked during the read pha
 ## Schema resolution
 
 `spec_parser.rs` normalises OpenAPI schemas into a flat `{type, properties}` structure before passing them to the
-generator. The resolution order is:
+generator. It also reads `servers[0].url` and prefixes every route path with the base path component (e.g. a spec
+with `url: http://localhost/api/v2` will produce routes under `/api/v2/...`). A root URL (`/` or empty) adds no prefix.
+
+The schema flattening resolution order is:
 
 ```mermaid
 flowchart TD
@@ -81,20 +84,25 @@ pre-generating each discriminator variant for POST/PUT/PATCH routes.
 
 ## Response generation
 
-`resource_generator.rs` walks a flattened schema and produces a `serde_json::Value`. Priority order:
+`resource_generator.rs` walks a flattened schema and produces a `serde_json::Value`. Resolution order:
 
-| Schema                        | Output                                                |
-|-------------------------------|-------------------------------------------------------|
-| has `example`                 | the example value, verbatim                           |
-| has `enum`                    | random pick from the enum values                      |
-| `type: object`                | object with each property recursively generated       |
-| `type: array` with `items`    | single-element array from items schema                |
-| `type: array` without `items` | empty array                                           |
-| `type: string` with `format`  | format-aware random value (UUID, date-time, email, …) |
-| `type: string`                | random word                                           |
-| `type: integer` / `number`    | random integer in 1–1000                              |
-| `type: boolean`               | random true/false                                     |
-| anything else                 | `null`                                                |
+| Schema condition                             | Output                                                              |
+|----------------------------------------------|---------------------------------------------------------------------|
+| has `example` (and `--ignore-examples` off)  | the example value, verbatim                                         |
+| has `default` (and `--ignore-examples` off)  | the default value, verbatim                                         |
+| has `enum`                                   | random pick from the enum values                                    |
+| `nullable: true`                             | `null` with ~30% probability, otherwise proceeds normally           |
+| `type: object`                               | object with each non-`writeOnly` property recursively generated     |
+| `type: object` with `additionalProperties`   | named properties plus 1–2 random extra keys from the schema         |
+| `type: array` with `items`                   | single-element array from items schema                              |
+| `type: array` without `items`                | empty array                                                         |
+| `type: string` with `format`                 | format-aware random value (UUID, date-time, email, …)               |
+| `type: string`                               | random words, clamped to `minLength` / `maxLength` if present       |
+| `type: integer` / `number`                   | random integer, bounded by `minimum` / `maximum` if present         |
+| `type: boolean`                              | random true/false                                                   |
+| anything else                                | `null`                                                              |
+
+`writeOnly: true` fields are excluded from generated responses. `readOnly: true` fields appear in responses but are ignored in request bodies (see Request handling below).
 
 ## Request handling
 
@@ -112,13 +120,15 @@ flowchart LR
     body --> disc{discriminator\nfield?}
     disc -- yes --> variant[pick pre-generated variant\nby discriminator value]
     disc -- no --> base[use pre-generated body]
-    variant --> merge[merge: overlay request\nfields onto base]
+    variant --> merge[merge: overlay request fields\nskipping readOnly fields]
     base --> merge
     merge --> json
 ```
 
 The route lookup key is `"METHOD /path/{param}"`. For body-accepting methods, the request body is merged on top of the
-pre-generated response -- request fields win over spec-derived fields.
+pre-generated response, with one exception: fields marked `readOnly: true` in the response schema keep their
+pre-generated value regardless of what the client sends. This mirrors the OpenAPI semantic -- `readOnly` fields are
+server-controlled (e.g. `id`, `createdAt`).
 
 ## Discriminator variants
 

@@ -164,24 +164,19 @@ fn get_item(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Response {
 fn get_collection(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Response {
     let mut store = state.store.write().unwrap();
     if !store.collection_initialized(concrete) {
+        let templates = state
+            .collection_templates
+            .get(&cfg.axum_path)
+            .cloned()
+            .unwrap_or_default();
         let filled = if ignore_examples() {
             if let Some(generator) = state.item_generators.get(&cfg.axum_path) {
                 let generator = Arc::clone(generator);
                 fill_to_count_with_generator(state.min_items, state.max_items, move || generator())
             } else {
-                let templates = state
-                    .collection_templates
-                    .get(&cfg.axum_path)
-                    .cloned()
-                    .unwrap_or_default();
                 fill_to_count(templates, state.min_items, state.max_items)
             }
         } else {
-            let templates = state
-                .collection_templates
-                .get(&cfg.axum_path)
-                .cloned()
-                .unwrap_or_default();
             fill_to_count(templates, state.min_items, state.max_items)
         };
         for item in filled {
@@ -237,7 +232,7 @@ fn post_item(
         cfg.body.clone()
     };
 
-    let new_item = merge(base, request_fields);
+    let new_item = merge_excluding(base, request_fields, &cfg.read_only_fields);
     let id = new_item
         .get("id")
         .and_then(|v| v.as_str())
@@ -273,7 +268,7 @@ fn put_or_patch(
         cfg.body.clone()
     };
 
-    let updated = merge(base, request_fields);
+    let updated = merge_excluding(base, request_fields, &cfg.read_only_fields);
     state
         .store
         .write()
@@ -282,15 +277,26 @@ fn put_or_patch(
     json_response(cfg.status_code, Some(updated))
 }
 
-fn merge(base: Option<serde_json::Value>, overlay: Option<serde_json::Value>) -> serde_json::Value {
+fn merge_excluding(
+    base: Option<serde_json::Value>,
+    overlay: Option<serde_json::Value>,
+    protected: &std::collections::HashSet<String>,
+) -> serde_json::Value {
     let mut result = base.unwrap_or(serde_json::Value::Null);
     if let (Some(obj), Some(serde_json::Value::Object(fields))) = (result.as_object_mut(), overlay)
     {
         for (k, v) in fields {
-            obj.insert(k, v);
+            if !protected.contains(&k) {
+                obj.insert(k, v);
+            }
         }
     }
     result
+}
+
+#[cfg(test)]
+fn merge(base: Option<serde_json::Value>, overlay: Option<serde_json::Value>) -> serde_json::Value {
+    merge_excluding(base, overlay, &Default::default())
 }
 
 fn json_response(status_code: u16, body: Option<serde_json::Value>) -> Response {
@@ -303,39 +309,55 @@ fn json_response(status_code: u16, body: Option<serde_json::Value>) -> Response 
 mod tests {
     use serde_json::json;
 
-    use super::merge;
+    use super::{merge, merge_excluding};
 
-    // --- merge ---
+    // --- merge: read-only field protection ---
+
+    #[test]
+    fn merge_does_not_override_protected_fields_from_base() {
+        let base = json!({ "id": "server-id", "name": "old" });
+        let overlay = json!({ "id": "client-id", "name": "new" });
+        let protected = std::collections::HashSet::from(["id".to_string()]);
+        let result = merge_excluding(Some(base), Some(overlay), &protected);
+        assert_eq!(
+            result["id"],
+            json!("server-id"),
+            "readOnly field should keep server value"
+        );
+        assert_eq!(
+            result["name"],
+            json!("new"),
+            "non-readOnly field should be overridden"
+        );
+    }
+
+    // --- merge: basic behaviour ---
 
     #[test]
     fn overlay_value_wins_over_base() {
         let base = json!({ "storyPoints": 5, "type": "feature" });
         let overlay = json!({ "storyPoints": 6 });
-        let result = merge(Some(base), Some(overlay));
-        assert_eq!(result["storyPoints"], json!(6));
+        assert_eq!(merge(Some(base), Some(overlay))["storyPoints"], json!(6));
     }
 
     #[test]
     fn base_value_kept_when_not_in_overlay() {
         let base = json!({ "id": "abc", "type": "feature" });
         let overlay = json!({ "type": "feature" });
-        let result = merge(Some(base), Some(overlay));
-        assert_eq!(result["id"], json!("abc"));
+        assert_eq!(merge(Some(base), Some(overlay))["id"], json!("abc"));
     }
 
     #[test]
     fn unknown_overlay_field_is_included() {
         let base = json!({ "type": "feature" });
         let overlay = json!({ "type": "feature", "coreRepo": "IAM" });
-        let result = merge(Some(base), Some(overlay));
-        assert_eq!(result["coreRepo"], json!("IAM"));
+        assert_eq!(merge(Some(base), Some(overlay))["coreRepo"], json!("IAM"));
     }
 
     #[test]
     fn no_overlay_returns_base_unchanged() {
         let base = json!({ "storyPoints": 5 });
-        let result = merge(Some(base.clone()), None);
-        assert_eq!(result, base);
+        assert_eq!(merge(Some(base.clone()), None), base);
     }
 
     // --- HTTP handler integration tests ---
@@ -357,9 +379,7 @@ mod tests {
             method,
             status_code: status,
             body,
-            discriminator_field: None,
-            variants: None,
-            item_generator: None,
+            ..Default::default()
         }
     }
 
@@ -465,7 +485,6 @@ mod tests {
             axum_path: "/items".to_string(),
             method: HttpMethod::Post,
             status_code: 201,
-            body: None,
             discriminator_field: Some("kind".to_string()),
             variants: Some(
                 [
@@ -474,7 +493,7 @@ mod tests {
                 ]
                 .into(),
             ),
-            item_generator: None,
+            ..Default::default()
         }]);
         let response = send(
             app,
@@ -498,10 +517,9 @@ mod tests {
             axum_path: "/items".to_string(),
             method: HttpMethod::Post,
             status_code: 201,
-            body: None,
             discriminator_field: Some("kind".to_string()),
             variants: Some([("a".to_string(), json!({"kind": "a", "fromVariantA": true}))].into()),
-            item_generator: None,
+            ..Default::default()
         }]);
         let response = send(
             app,
@@ -523,10 +541,9 @@ mod tests {
             axum_path: "/items".to_string(),
             method: HttpMethod::Post,
             status_code: 201,
-            body: None,
             discriminator_field: Some("kind".to_string()),
             variants: Some([("a".to_string(), json!({"kind": "a", "score": 5}))].into()),
-            item_generator: None,
+            ..Default::default()
         }]);
         let response = send(
             app,
@@ -720,6 +737,102 @@ mod tests {
         )
         .await;
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    // --- readOnly field protection (HTTP integration) ---
+
+    #[tokio::test]
+    async fn post_does_not_let_request_body_override_read_only_fields() {
+        let app = build(vec![RouteConfig {
+            axum_path: "/items".to_string(),
+            method: HttpMethod::Post,
+            status_code: 201,
+            body: Some(json!({ "id": "server-id", "name": "" })),
+            read_only_fields: std::collections::HashSet::from(["id".to_string()]),
+            ..Default::default()
+        }]);
+        let response = send(
+            app,
+            Request::builder()
+                .method(Method::POST)
+                .uri("/items")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"id":"client-id","name":"Bob"}"#))
+                .unwrap(),
+        )
+        .await;
+        let body = response_json(response).await;
+        assert_eq!(
+            body["id"],
+            json!("server-id"),
+            "readOnly id should not be overridden by client"
+        );
+        assert_eq!(body["name"], json!("Bob"));
+    }
+
+    #[tokio::test]
+    async fn put_does_not_let_request_body_override_read_only_fields() {
+        let app = build(vec![RouteConfig {
+            axum_path: "/items/{id}".to_string(),
+            method: HttpMethod::Put,
+            status_code: 200,
+            body: Some(
+                json!({ "id": "server-id", "createdAt": "2020-01-01T00:00:00Z", "name": "" }),
+            ),
+            read_only_fields: std::collections::HashSet::from([
+                "id".to_string(),
+                "createdAt".to_string(),
+            ]),
+            ..Default::default()
+        }]);
+        let response = send(
+            app,
+            Request::builder()
+                .method(Method::PUT)
+                .uri("/items/server-id")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"id":"hacked","createdAt":"1970-01-01T00:00:00Z","name":"Alice"}"#,
+                ))
+                .unwrap(),
+        )
+        .await;
+        let body = response_json(response).await;
+        assert_eq!(body["id"], json!("server-id"));
+        assert_eq!(body["createdAt"], json!("2020-01-01T00:00:00Z"));
+        assert_eq!(body["name"], json!("Alice"));
+    }
+
+    #[tokio::test]
+    async fn patch_does_not_let_request_body_override_read_only_fields() {
+        let app = build(vec![RouteConfig {
+            axum_path: "/items/{id}".to_string(),
+            method: HttpMethod::Patch,
+            status_code: 200,
+            body: Some(
+                json!({ "id": "server-id", "createdAt": "2020-01-01T00:00:00Z", "name": "old" }),
+            ),
+            read_only_fields: std::collections::HashSet::from([
+                "id".to_string(),
+                "createdAt".to_string(),
+            ]),
+            ..Default::default()
+        }]);
+        let response = send(
+            app,
+            Request::builder()
+                .method(Method::PATCH)
+                .uri("/items/server-id")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"createdAt":"1970-01-01T00:00:00Z","name":"new"}"#,
+                ))
+                .unwrap(),
+        )
+        .await;
+        let body = response_json(response).await;
+        assert_eq!(body["createdAt"], json!("2020-01-01T00:00:00Z"));
+        assert_eq!(body["name"], json!("new"));
     }
 
     // --- CRUD state tests ---
@@ -1019,5 +1132,76 @@ mod tests {
         )
         .await;
         assert_eq!(response_json(response).await.as_array().unwrap().len(), 5);
+    }
+
+    // --- ignore_examples collection generation ---
+
+    struct IgnoreExamplesGuard;
+    impl Drop for IgnoreExamplesGuard {
+        fn drop(&mut self) {
+            crate::resource_generator::set_ignore_examples(false);
+        }
+    }
+
+    #[tokio::test]
+    async fn get_collection_with_ignore_examples_uses_item_generator_when_present() {
+        use std::sync::Arc;
+        crate::resource_generator::set_ignore_examples(true);
+        let _guard = IgnoreExamplesGuard;
+
+        let generator: Arc<dyn Fn() -> serde_json::Value + Send + Sync> =
+            Arc::new(|| json!({"name": "generated"}));
+        let app = build_with_bounds(
+            vec![RouteConfig {
+                axum_path: "/items".to_string(),
+                method: HttpMethod::Get,
+                status_code: 200,
+                body: Some(json!([])),
+                item_generator: Some(generator),
+                ..Default::default()
+            }],
+            1,
+            1,
+        );
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response_json(response).await;
+        let items = body.as_array().unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0]["name"], json!("generated"));
+    }
+
+    #[tokio::test]
+    async fn get_collection_with_ignore_examples_falls_back_to_templates_without_generator() {
+        crate::resource_generator::set_ignore_examples(true);
+        let _guard = IgnoreExamplesGuard;
+
+        let app = build_with_bounds(
+            vec![route(
+                HttpMethod::Get,
+                "/items",
+                200,
+                Some(json!([{"id": "seed", "name": "x"}])),
+            )],
+            2,
+            2,
+        );
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response_json(response).await.as_array().unwrap().len(), 2);
     }
 }

@@ -164,10 +164,27 @@ pub struct RouteConfig {
     pub discriminator_field: Option<String>,
     pub variants: Option<HashMap<String, serde_json::Value>>,
     pub item_generator: Option<Arc<dyn Fn() -> serde_json::Value + Send + Sync>>,
+    pub read_only_fields: std::collections::HashSet<String>,
+}
+
+impl Default for RouteConfig {
+    fn default() -> Self {
+        Self {
+            axum_path: String::new(),
+            method: HttpMethod::Get,
+            status_code: 200,
+            body: None,
+            discriminator_field: None,
+            variants: None,
+            item_generator: None,
+            read_only_fields: Default::default(),
+        }
+    }
 }
 
 pub fn extract_routes(spec: &Value) -> Vec<RouteConfig> {
     let spec_arc = Arc::new(spec.clone());
+    let base = server_base_path(spec);
     let Some(paths) = spec.get("paths").and_then(|v| v.as_mapping()) else {
         return Vec::new();
     };
@@ -177,16 +194,41 @@ pub fn extract_routes(spec: &Value) -> Vec<RouteConfig> {
         let Some(path_str) = path_val.as_str() else {
             continue;
         };
+        let axum_path = format!("{}{}", base, path_str);
         for &method in HttpMethod::ALL {
-            if let Some(route) = path_item
+            if let Some(mut route) = path_item
                 .get(method.as_str())
                 .and_then(|op| route_for_operation(path_str, method, op, spec, &spec_arc))
             {
+                route.axum_path = axum_path.clone();
                 routes.push(route);
             }
         }
     }
     routes
+}
+
+fn server_base_path(spec: &Value) -> String {
+    let url = spec
+        .get("servers")
+        .and_then(|s| s.get(0))
+        .and_then(|s| s.get("url"))
+        .and_then(|u| u.as_str())
+        .unwrap_or("");
+    let path = if url.contains("://") {
+        url.splitn(4, '/')
+            .nth(3)
+            .map(|p| format!("/{}", p))
+            .unwrap_or_default()
+    } else {
+        url.to_string()
+    };
+    let trimmed = path.trim_end_matches('/');
+    if trimmed == "/" || trimmed.is_empty() {
+        String::new()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 fn route_for_operation(
@@ -211,10 +253,7 @@ fn route_for_operation(
             axum_path: path.to_string(),
             method,
             status_code,
-            body: None,
-            discriminator_field: None,
-            variants: None,
-            item_generator: None,
+            ..Default::default()
         },
     })
 }
@@ -227,6 +266,7 @@ fn route_from_schema(
     spec: &Value,
     spec_arc: &Arc<Value>,
 ) -> RouteConfig {
+    let read_only_fields = collect_read_only_fields(schema, spec);
     if method.uses_request_body()
         && let Some((disc_field, keys)) = find_discriminator(schema, spec)
     {
@@ -243,10 +283,10 @@ fn route_from_schema(
             axum_path: path.to_string(),
             method,
             status_code,
-            body: None,
             discriminator_field: Some(disc_field),
             variants: Some(variants),
-            item_generator: None,
+            read_only_fields,
+            ..Default::default()
         };
     }
     let item_generator = build_item_generator(schema, spec, spec_arc);
@@ -255,10 +295,25 @@ fn route_from_schema(
         method,
         status_code,
         body: Some(crate::resource_generator::generate(schema, spec, None)),
-        discriminator_field: None,
-        variants: None,
         item_generator,
+        read_only_fields,
+        ..Default::default()
     }
+}
+
+fn collect_read_only_fields(schema: &Value, root: &Value) -> std::collections::HashSet<String> {
+    let flat = flatten_schema(schema, root);
+    let mut fields = std::collections::HashSet::new();
+    if let Some(props) = flat.get("properties").and_then(|v| v.as_mapping()) {
+        for (k, v) in props {
+            if let Some(key) = k.as_str()
+                && v.get("readOnly").and_then(|b| b.as_bool()).unwrap_or(false)
+            {
+                fields.insert(key.to_string());
+            }
+        }
+    }
+    fields
 }
 
 fn build_item_generator(
@@ -773,6 +828,86 @@ mod tests {
         );
     }
 
+    // --- server base path ---
+
+    #[test]
+    fn extract_routes_prefixes_paths_with_server_base_path() {
+        let spec = yaml(
+            "servers:\n\
+             \x20 - url: /api/dog-cafe\n\
+             paths:\n\
+             \x20 /dogs:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].axum_path, "/api/dog-cafe/dogs");
+    }
+
+    #[test]
+    fn extract_routes_extracts_path_from_full_server_url() {
+        let spec = yaml(
+            "servers:\n\
+             \x20 - url: http://127.0.0.1:8532/api/dog-cafe\n\
+             paths:\n\
+             \x20 /dogs:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].axum_path, "/api/dog-cafe/dogs");
+    }
+
+    #[test]
+    fn extract_routes_with_root_server_url_does_not_prefix() {
+        let spec = yaml(
+            "servers:\n\
+             \x20 - url: /\n\
+             paths:\n\
+             \x20 /dogs:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].axum_path, "/dogs");
+    }
+
+    #[test]
+    fn extract_routes_with_no_servers_does_not_prefix() {
+        let spec = yaml(
+            "paths:\n\
+             \x20 /dogs:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].axum_path, "/dogs");
+    }
+
+    #[test]
+    fn extract_routes_preserves_path_parameters_after_prefix() {
+        let spec = yaml(
+            "servers:\n\
+             \x20 - url: /api/v1\n\
+             paths:\n\
+             \x20 /dogs/{id}:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].axum_path, "/api/v1/dogs/{id}");
+    }
+
     #[test]
     fn extract_routes_preserves_openapi_path_format() {
         let spec = yaml(
@@ -785,5 +920,63 @@ mod tests {
         );
         let routes = extract_routes(&spec);
         assert_eq!(routes[0].axum_path, "/projects/{projectId}");
+    }
+
+    // --- read_only_fields collection ---
+
+    #[test]
+    fn extract_routes_post_collects_read_only_fields_from_response_schema() {
+        let spec = yaml(
+            "paths:\n\
+             \x20 /items:\n\
+             \x20   post:\n\
+             \x20     responses:\n\
+             \x20       '201':\n\
+             \x20         content:\n\
+             \x20           application/json:\n\
+             \x20             schema:\n\
+             \x20               type: object\n\
+             \x20               properties:\n\
+             \x20                 id:\n\
+             \x20                   type: string\n\
+             \x20                   readOnly: true\n\
+             \x20                 name:\n\
+             \x20                   type: string\n\
+             \x20         description: Created",
+        );
+        let routes = extract_routes(&spec);
+        assert!(routes[0].read_only_fields.contains("id"));
+        assert!(!routes[0].read_only_fields.contains("name"));
+    }
+
+    // --- item_generator invocation ---
+
+    #[test]
+    fn extract_routes_item_generator_produces_a_value_matching_schema() {
+        let spec = yaml(
+            "paths:\n\
+             \x20 /items:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         content:\n\
+             \x20           application/json:\n\
+             \x20             schema:\n\
+             \x20               type: array\n\
+             \x20               items:\n\
+             \x20                 type: object\n\
+             \x20                 properties:\n\
+             \x20                   name:\n\
+             \x20                     type: string\n\
+             \x20                     example: hello\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        let r#gen = routes[0]
+            .item_generator
+            .as_ref()
+            .expect("expected item_generator");
+        let value = r#gen();
+        assert!(value.is_object());
     }
 }

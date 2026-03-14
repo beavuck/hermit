@@ -1,4 +1,4 @@
-openapi: 3.1.1
+openapi: 3.2.0
 info:
   title: Taskflow API
   version: 1.0.0
@@ -63,7 +63,15 @@ paths:
           description: Available methods
       operationId: optionsProjects
       summary: Available HTTP methods for /projects
-  '/projects/{projectId}':
+  /projects/{projectId}:
+    trace:
+      tags:
+        - Projects
+      responses:
+        '200':
+          description: Trace
+      operationId: traceProject
+      summary: Trace request to /projects/{projectId}
     get:
       tags:
         - Projects
@@ -118,17 +126,9 @@ paths:
           description: Project exists
       operationId: checkProject
       summary: Check a project exists
-    trace:
-      tags:
-        - Projects
-      responses:
-        '200':
-          description: Trace
-      operationId: traceProject
-      summary: Trace request to /projects/{projectId}
     parameters:
       - $ref: '#/components/parameters/ProjectIdParam'
-  '/projects/{projectId}/tasks':
+  /projects/{projectId}/tasks:
     get:
       tags:
         - Tasks
@@ -180,7 +180,7 @@ paths:
       summary: Create a task in a project
     parameters:
       - $ref: '#/components/parameters/ProjectIdParam'
-  '/projects/{projectId}/tasks/{taskId}':
+  /projects/{projectId}/tasks/{taskId}:
     get:
       tags:
         - Tasks
@@ -220,7 +220,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ProjectIdParam'
       - $ref: '#/components/parameters/TaskIdParam'
-  '/projects/{projectId}/tasks/{taskId}/comments':
+  /projects/{projectId}/tasks/{taskId}/comments:
     get:
       tags:
         - Comments
@@ -296,7 +296,7 @@ paths:
           $ref: '#/components/responses/ValidationError'
       operationId: createLabel
       summary: Create a label
-  '/labels/{labelId}':
+  /labels/{labelId}:
     get:
       tags:
         - Labels
@@ -333,6 +333,16 @@ paths:
           $ref: '#/components/responses/ValidationError'
       operationId: replaceLabel
       summary: Replace a label
+    delete:
+      tags:
+        - Labels
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+      operationId: deleteLabel
+      summary: Delete a label
     patch:
       requestBody:
         content:
@@ -355,16 +365,6 @@ paths:
           $ref: '#/components/responses/ValidationError'
       operationId: updateLabel
       summary: Partially update a label
-    delete:
-      tags:
-        - Labels
-      responses:
-        '204':
-          description: Deleted
-        '404':
-          $ref: '#/components/responses/NotFound'
-      operationId: deleteLabel
-      summary: Delete a label
     parameters:
       - $ref: '#/components/parameters/LabelIdParam'
 components:
@@ -433,7 +433,7 @@ components:
           nullable: true
           format: uri
           type: string
-          example: 'https://avatars.example.com/alexis.png'
+          example: https://avatars.example.com/alexis.png
     ProjectBase:
       required:
         - name
@@ -496,7 +496,7 @@ components:
         description:
           nullable: true
           type: string
-          example: 'Support allOf, oneOf, anyOf resolution when generating mock responses'
+          example: Support allOf, oneOf, anyOf resolution when generating mock responses
         type:
           $ref: '#/components/schemas/TaskType'
         status:
@@ -656,7 +656,7 @@ components:
         body:
           minLength: 1
           type: string
-          example: 'oneOf resolution is the tricky part, start there'
+          example: oneOf resolution is the tricky part, start there
     Comment:
       allOf:
         - $ref: '#/components/schemas/Entity'
@@ -694,12 +694,12 @@ components:
       type: object
       properties:
         name:
-          type: string
-          minLength: 1
           maxLength: 50
-        color:
+          minLength: 1
           type: string
+        color:
           description: Display color for the label
+          type: string
         description:
           nullable: true
           type: string

@@ -12,7 +12,7 @@ test:
 
 lint:
     cargo fmt --all
-    cargo clippy --fix --all-targets
+    cargo clippy --fix --all-targets --allow-dirty --allow-staged
 
 coverage:
     cargo llvm-cov --html --ignore-filename-regex "main\.rs|http_method\.rs"

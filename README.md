@@ -97,11 +97,14 @@ curl -s -X POST http://localhost:8532/projects/abc/tasks \
 
 Response field values are resolved in priority order:
 
-| Priority | Source              | When                                                                                 |
-|----------|---------------------|--------------------------------------------------------------------------------------|
-| 1        | Request body fields | `POST`, `PUT`, `PATCH` -- caller's values always win                                 |
-| 2        | `example` in schema | Field has an explicit example value                                                  |
-| 3        | Random value        | Fallback -- random word, number, boolean, or format-aware value (UUID, date-time, …) |
+| Priority | Source              | When                                                                                         |
+|----------|---------------------|----------------------------------------------------------------------------------------------|
+| 1        | Request body fields | `POST`, `PUT`, `PATCH` -- caller's values win, except for `readOnly` fields                  |
+| 2        | `example` in schema | Field has an explicit example value                                                          |
+| 3        | `default` in schema | Field has a default value and no example                                                     |
+| 4        | Random value        | Fallback -- random word, number, boolean, or format-aware value (UUID, date-time, …)         |
+
+Fields marked `readOnly: true` in the schema are never overridden by request body values. Fields marked `writeOnly: true` are excluded from generated responses entirely.
 
 ## 🛠️ Install
 
@@ -167,20 +170,18 @@ _And now some dev stuff_
 
 ## 🛞 Build and run
 
-```bash
-cargo run --release -- --specs specs_assets/taskflow.openapi.yml
-```
-
 Load multiple specs in one command:
 
 ```bash
 cargo run --release -- --specs specs_assets/taskflow.openapi.yml specs_assets/dog_cafe.openapi.yml
 ```
 
-The server listens on port `8532` by default. Override with `--port`:
+The server listens on port `8532` by default. Override with `--port`.
+
+To see what arguments are available, run:
 
 ```bash
-cargo run --release -- --port 9000 --specs specs_assets/taskflow.openapi.yml
+hermit --help
 ```
 
 ## 🔧 Development setup

@@ -26,13 +26,7 @@ impl CrudStore {
         if self.items.contains_key(path) {
             return;
         }
-        let id = last_segment(path).to_string();
-        let parent = parent_path(path).to_string();
-        self.items.insert(path.to_string(), value);
-        let ids = self.collections.entry(parent).or_default();
-        if !ids.contains(&id) {
-            ids.push(id);
-        }
+        self.register_in_collection(path, value);
     }
 
     pub fn get_item(&self, path: &str) -> Option<&Value> {
@@ -40,6 +34,10 @@ impl CrudStore {
     }
 
     pub fn put_item(&mut self, path: &str, value: Value) {
+        self.register_in_collection(path, value);
+    }
+
+    fn register_in_collection(&mut self, path: &str, value: Value) {
         let id = last_segment(path).to_string();
         let parent = parent_path(path).to_string();
         self.items.insert(path.to_string(), value);
