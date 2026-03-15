@@ -15,9 +15,23 @@ async fn main() {
         .layer(axum::middleware::from_fn(log_request));
 
     let addr = (constants::BIND_ADDR, args.port);
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("listener should bind to the configured address");
     print_banner(args.port);
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .expect("server should serve without error");
+}
+
+async fn shutdown_signal() {
+    use tokio::signal::unix::{SignalKind, signal};
+    let mut sigterm = signal(SignalKind::terminate()).expect("SIGTERM handler should register");
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {}
+        _ = sigterm.recv() => {}
+    }
 }
 
 async fn log_request(
@@ -53,7 +67,7 @@ fn print_banner(port: u16) {
               (   (  )   )
               ..//(o o)\\..                       hermit
 
- Ready on port {port}
+ Ready on port {port} (if this is running in a container, this port number is internal to the container)
 "#
     );
 }

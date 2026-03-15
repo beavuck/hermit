@@ -44,5 +44,6 @@ up-minor:
 up-patch:
     cargo set-version --bump patch
 
+# Produces a statically-linked x86_64 (linux/amd64) binary. Not portable to other architectures.
 build-release:
     rustup target add x86_64-unknown-linux-musl && cargo build --release --target x86_64-unknown-linux-musl

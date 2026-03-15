@@ -2,23 +2,29 @@ use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS, DEFAULT_PORT};
 
 #[derive(clap::Parser)]
 pub struct Args {
-    #[arg(long, default_value_t = DEFAULT_PORT)]
+    /// If running in a Docker container, this port number will be internal to the container.
+    /// In that case, to expose Hermit on your desired port on the host machine,
+    /// use Docker's port mapping (e.g. `docker run -p 9876:8532 hermit` to expose on port 9876).
+    #[arg(long, default_value_t = DEFAULT_PORT, env = "HERMIT_PORT")]
     pub port: u16,
 
-    /// One or more OpenAPI spec files to load. Can be specified multiple times or as a space-separated list.
-    #[arg(long, num_args = 1..)]
+    /// One or more OpenAPI spec files to load.
+    /// Can be specified multiple times, as a space-separated list, or via HERMIT_SPECS (comma-separated).
+    #[arg(long, num_args = 1.., env = "HERMIT_SPECS", value_delimiter = ',')]
     pub specs: Vec<std::path::PathBuf>,
 
-    /// The minimum number of items to generate for array schemas. Must not be greater than `--max-items`.
-    #[arg(long, default_value_t = DEFAULT_MIN_ITEMS)]
+    /// The minimum number of items to generate for array schemas.
+    /// Must not be greater than `--max-items`.
+    #[arg(long, default_value_t = DEFAULT_MIN_ITEMS, env = "HERMIT_MIN_ITEMS")]
     pub min_items: usize,
 
-    /// The maximum number of items to generate for array schemas. Must not be less than `--min-items`.
-    #[arg(long, default_value_t = DEFAULT_MAX_ITEMS)]
+    /// The maximum number of items to generate for array schemas.
+    /// Must not be less than `--min-items`.
+    #[arg(long, default_value_t = DEFAULT_MAX_ITEMS, env = "HERMIT_MAX_ITEMS")]
     pub max_items: usize,
 
-    /// Skip `example` values from the spec and generate random data instead
-    #[arg(long, default_value_t = false)]
+    /// Skip `example` values from the spec and generate random data instead.
+    #[arg(long, default_value_t = false, env = "HERMIT_IGNORE_EXAMPLES")]
     pub ignore_examples: bool,
 }
 

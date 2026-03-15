@@ -58,6 +58,13 @@ include:
       script_to_install_deps: "$SCRIPT_TO_INSTALL_DEPS"
       consecutive_command_commits_allowed: true
 
+  - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/docker-publisher/docker-publisher@main"
+    inputs:
+      job_name: "publish_to_docker"
+      stage_config: "deploy"
+      image_name: "beavuck/hermit"
+      publish_to_dockerhub: true
+
 find_secrets:
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
@@ -70,6 +77,11 @@ format:
 upgrade:
   rules:
     - if: "$CI_PIPELINE_SOURCE == 'schedule' && $IS_UPGRADE == 'true'"
+
+publish_to_docker:
+  rules:
+    - if: "$CI_COMMIT_TAG"
+      when: manual
 
 ########~~~~-- Templates --~~~~########
 
@@ -211,6 +223,7 @@ release_hermit:
   rules:
     - if: "$CI_COMMIT_TAG"
   needs:
+    - job: publish_to_docker
     - job: build_hermit
       artifacts: true
   before_script:
@@ -229,3 +242,6 @@ release_hermit:
         - name: "linux-executable"
           url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hermit/${CI_COMMIT_TAG}/hermit"
           link_type: package
+        - name: "docker-image"
+          url: "https://hub.docker.com/repository/docker/beavuck/hermit/tags?name=${CI_COMMIT_TAG}"
+          link_type: image

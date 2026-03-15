@@ -3,6 +3,8 @@
 Hermit is a zero-config OpenAPI mock server. Point it at a spec file, and it starts serving lightning-fast
 schema-accurate responses out of the box -- no stubs to write, no configuration.
 
+At the moment, it is made for running on Linux AMD64 platforms (x86_64) only.
+
 ## 📊 Status
 
 [![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=beavuck-services_hermit)](https://sonarcloud.io/summary/new_code?id=beavuck-services_hermit)
@@ -192,6 +194,10 @@ Requires the server to be running. Run with [Bruno](https://www.usebruno.com/):
 ```bash
 cd api_tests/hermit_api_tests && npx --yes @usebruno/cli run --env hermit_env --reporter-html test_report.html --reporter-json test_report.json
 ```
+
+## 🐳 Docker
+
+See [DOCKER.md](DOCKER.md).
 
 ## 🏗️ Architecture
 

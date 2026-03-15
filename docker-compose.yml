@@ -33,5 +33,15 @@ services:
     depends_on:
       - api-editor
 
+  hermit:
+    image: beavuck/hermit:latest
+    environment:
+      HERMIT_SPECS: specs/taskflow.openapi.yml,specs/dog_cafe.openapi.yml
+      HERMIT_IGNORE_EXAMPLES: true
+    ports:
+      - "8532:8532"
+    volumes:
+      - ./specs_assets:/specs:ro
+
 volumes:
   api-editor-db-data:

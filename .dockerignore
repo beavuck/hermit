@@ -1,0 +1,15 @@
+# Allow list
+**
+!Cargo.toml
+!Cargo.lock
+!src/**
+!benches/
+
+# Deny list (safety net)
+**/.env
+**/.env.*
+**/secrets
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx

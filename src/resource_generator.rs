@@ -334,7 +334,7 @@ mod tests {
     fn generate_string_without_example_is_a_multi_word_phrase() {
         let root = yaml("{}");
         let result = generate(&yaml("type: string"), &root, None);
-        let s = result.as_str().expect("expected a string");
+        let s = result.as_str().expect("generated value should be a string");
         assert!(s.contains(' '), "expected a multi-word phrase, got {s:?}");
     }
 
@@ -393,7 +393,7 @@ mod tests {
     // --- formats ---
 
     fn assert_matches(value: &serde_json::Value, pattern: &str) {
-        let s = value.as_str().expect("expected a string value");
+        let s = value.as_str().expect("generated value should be a string");
         let re = regex::Regex::new(pattern).unwrap();
         assert!(
             re.is_match(s),
@@ -694,7 +694,7 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: string\nminLength: 100");
         let result = generate(&schema, &root, None);
-        let s = result.as_str().expect("expected a string");
+        let s = result.as_str().expect("generated value should be a string");
         assert!(
             s.len() >= 100,
             "expected length >= 100, got {} ({s:?})",
@@ -707,7 +707,7 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: string\nmaxLength: 2");
         let result = generate(&schema, &root, None);
-        let s = result.as_str().expect("expected a string");
+        let s = result.as_str().expect("generated value should be a string");
         assert!(
             s.len() <= 2,
             "expected length <= 2, got {} ({s:?})",
@@ -720,7 +720,7 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: string\nminLength: 10\nmaxLength: 15");
         let result = generate(&schema, &root, None);
-        let s = result.as_str().expect("expected a string");
+        let s = result.as_str().expect("generated value should be a string");
         assert!(
             s.len() >= 10 && s.len() <= 15,
             "expected 10 <= length <= 15, got {} ({s:?})",
@@ -735,7 +735,9 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: integer\nminimum: 5000");
         let result = generate(&schema, &root, None);
-        let n = result.as_i64().expect("expected an integer");
+        let n = result
+            .as_i64()
+            .expect("generated value should be an integer");
         assert!(n >= 5000, "expected n >= 5000, got {n}");
     }
 
@@ -744,7 +746,9 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: integer\nmaximum: 0");
         let result = generate(&schema, &root, None);
-        let n = result.as_i64().expect("expected an integer");
+        let n = result
+            .as_i64()
+            .expect("generated value should be an integer");
         assert!(n <= 0, "expected n <= 0, got {n}");
     }
 
@@ -753,7 +757,9 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: integer\nminimum: 10\nmaximum: 20");
         let result = generate(&schema, &root, None);
-        let n = result.as_i64().expect("expected an integer");
+        let n = result
+            .as_i64()
+            .expect("generated value should be an integer");
         assert!((10..=20).contains(&n), "expected 10 <= n <= 20, got {n}");
     }
 
@@ -762,7 +768,7 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: number\nminimum: 5000");
         let result = generate(&schema, &root, None);
-        let n = result.as_f64().expect("expected a number");
+        let n = result.as_f64().expect("generated value should be a number");
         assert!(n >= 5000.0, "expected n >= 5000.0, got {n}");
     }
 
@@ -771,7 +777,7 @@ mod tests {
         let root = yaml("{}");
         let schema = yaml("type: number\nmaximum: 0");
         let result = generate(&schema, &root, None);
-        let n = result.as_f64().expect("expected a number");
+        let n = result.as_f64().expect("generated value should be a number");
         assert!(n <= 0.0, "expected n <= 0.0, got {n}");
     }
 

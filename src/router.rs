@@ -901,7 +901,7 @@ mod tests {
         let location = response
             .headers()
             .get("location")
-            .expect("missing Location header");
+            .expect("response should contain a Location header");
         assert!(location.to_str().unwrap().starts_with("/items/"));
     }
 

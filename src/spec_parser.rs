@@ -7,8 +7,8 @@ use rayon::prelude::*;
 use crate::http_method::HttpMethod;
 
 pub fn load(path: &std::path::Path) -> Value {
-    let text = std::fs::read_to_string(path).expect("spec file not found");
-    yaml_serde::from_str(&text).expect("invalid YAML")
+    let text = std::fs::read_to_string(path).expect("spec file should be readable");
+    yaml_serde::from_str(&text).expect("spec file should contain valid YAML")
 }
 
 pub fn load_all(paths: &[std::path::PathBuf]) -> Vec<RouteConfig> {
@@ -25,7 +25,7 @@ pub fn load_all(paths: &[std::path::PathBuf]) -> Vec<RouteConfig> {
 
     handles
         .into_iter()
-        .flat_map(|h| h.join().expect("spec loader thread panicked"))
+        .flat_map(|h| h.join().expect("spec loader thread should not panic"))
         .collect()
 }
 
@@ -975,7 +975,7 @@ mod tests {
         let r#gen = routes[0]
             .item_generator
             .as_ref()
-            .expect("expected item_generator");
+            .expect("route should have an item_generator");
         let value = r#gen();
         assert!(value.is_object());
     }
