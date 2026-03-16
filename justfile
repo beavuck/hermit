@@ -1,5 +1,5 @@
 setup:
-    cargo install cargo-llvm-cov critcmp cargo-edit
+    cargo install cargo-llvm-cov critcmp cargo-edit cargo-zigbuild
 
 bench:
     cargo bench --bench startup_bench --bench generate_bench --bench request_bench
@@ -44,6 +44,7 @@ up-minor:
 up-patch:
     cargo set-version --bump patch
 
-# Produces a statically-linked x86_64 (linux/amd64) binary. Not portable to other architectures.
+RUST_TARGET := env_var_or_default('RUST_TARGET', 'x86_64-unknown-linux-musl')
+
 build-release:
-    rustup target add x86_64-unknown-linux-musl && cargo build --release --target x86_64-unknown-linux-musl
+    rustup target add {{ RUST_TARGET }} && cargo zigbuild --release --target {{ RUST_TARGET }}

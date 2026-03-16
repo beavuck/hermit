@@ -2,7 +2,7 @@
 **
 !Cargo.toml
 !Cargo.lock
-!src/**
+!src/
 !benches/
 
 # Deny list (safety net)

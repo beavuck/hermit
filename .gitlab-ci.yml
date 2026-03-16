@@ -62,7 +62,8 @@ include:
     inputs:
       job_name: "publish_to_docker"
       stage_config: "deploy"
-      image_name: "beavuck/hermit"
+      image_name: "beavuck/${CI_PROJECT_NAME}"
+      platforms: "linux/amd64,linux/arm64"
       publish_to_dockerhub: true
 
 find_secrets:
@@ -146,17 +147,31 @@ analyze:
 build_hermit:
   extends: .cargo_cache
   stage: build
-  variables:
-    RUSTFLAGS: "-C target-feature=+crt-static"
+  parallel:
+    matrix:
+      - ARCH: amd64
+        RUST_TARGET: x86_64-unknown-linux-musl
+        RUSTFLAGS: "-C target-feature=+crt-static"
+      - ARCH: arm64
+        RUST_TARGET: aarch64-unknown-linux-musl
+        RUSTFLAGS: "-C target-feature=+crt-static"
+      - ARCH: windows-amd64
+        RUST_TARGET: x86_64-pc-windows-gnu
+        RUSTFLAGS: ""
+  cache:
+    key: "cargo-$CI_COMMIT_REF_SLUG-$RUST_TARGET"
+    paths:
+      - .cargo/
+      - target/
   script:
-    - apk add --no-cache rustup
+    - apk add --no-cache rustup zig
     - rustup-init -y
-    - cargo install just
+    - cargo install just cargo-zigbuild
     - just build-release
   artifacts:
     expire_in: 1 day
     paths:
-      - target/x86_64-unknown-linux-musl/release/hermit
+      - target/$RUST_TARGET/release/hermit*
   rules:
     - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
     - if: "$CI_COMMIT_TAG"
@@ -216,6 +231,10 @@ run_api_tests:
     - job: find_secrets
       optional: true
     - job: build_hermit
+      parallel:
+        matrix:
+          - ARCH: amd64
+            RUST_TARGET: x86_64-unknown-linux-musl
 
 release_hermit:
   stage: deploy
@@ -231,17 +250,31 @@ release_hermit:
   script:
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        --upload-file target/x86_64-unknown-linux-musl/release/hermit \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hermit/${CI_COMMIT_TAG}/hermit"
+        --upload-file target/x86_64-unknown-linux-musl/release/${CI_PROJECT_NAME} \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-amd64"
+    - |
+      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file target/aarch64-unknown-linux-musl/release/${CI_PROJECT_NAME} \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-arm64"
+    - |
+      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file target/x86_64-pc-windows-gnu/release/${CI_PROJECT_NAME}.exe \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-windows-amd64.exe"
   release:
     name: "$CI_COMMIT_TAG"
     tag_name: "$CI_COMMIT_TAG"
-    description: "Details: https://${CI_SERVER_FQDN}/beavuck-services/hermit/-/network/main?ref_type=heads"
+    description: "Details: https://${CI_SERVER_FQDN}/beavuck-services/${CI_PROJECT_NAME}/-/network/main?ref_type=heads"
     assets:
       links:
-        - name: "linux-executable"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/hermit/${CI_COMMIT_TAG}/hermit"
+        - name: "linux-amd64-executable"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-amd64"
+          link_type: package
+        - name: "linux-arm64-executable"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-arm64"
+          link_type: package
+        - name: "windows-amd64-executable"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-windows-amd64.exe"
           link_type: package
         - name: "docker-image"
-          url: "https://hub.docker.com/repository/docker/beavuck/hermit/tags?name=${CI_COMMIT_TAG}"
+          url: "https://hub.docker.com/repository/docker/beavuck/${CI_PROJECT_NAME}/tags?name=${CI_COMMIT_TAG}"
           link_type: image
