@@ -222,7 +222,7 @@ run_api_tests:
   stage: build
   image: node:lts-alpine
   script:
-    - ./target/x86_64-unknown-linux-musl/release/hermit --specs specs_assets/taskflow.openapi.yml specs_assets/dog_cafe.openapi.yml &
+    - ./target/x86_64-unknown-linux-musl/release/hermit --specs-dir specs_assets &
     - sleep 1
     - cd api_tests/hermit_api_tests && npx --yes @usebruno/cli run --env hermit_env --bail
   rules:

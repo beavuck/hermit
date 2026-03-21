@@ -1,6 +1,9 @@
 setup:
     cargo install cargo-llvm-cov critcmp cargo-edit cargo-zigbuild
 
+run:
+    cargo run -- --ignore-examples --specs-dir specs_assets
+
 bench:
     cargo bench --bench startup_bench --bench generate_bench --bench request_bench
 

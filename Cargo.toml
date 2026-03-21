@@ -9,7 +9,7 @@ readme = "README.md"
 description = "OpenAPI mock server -- serve realistic responses from any OpenAPI spec"
 keywords = ["openapi", "mock", "mock-server", "cli"]
 categories = ["command-line-utilities", "web-programming", "development-tools::testing"]
-include = ["src/**/*", "README.md", "UNLICENSE"]
+include = ["src/**/*", "README.md", "UNLICENSE", "PRIVACY.md"]
 
 [dependencies]
 tokio = { version = "1.50.0", features = ["macros", "net", "rt-multi-thread", "sync", "signal"] }

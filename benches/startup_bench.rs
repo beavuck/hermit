@@ -2,7 +2,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use hermit::spec_parser;
 
 const TASKFLOW_PATH: &str = "specs_assets/taskflow.openapi.yml";
-const DOG_CAFE_PATH: &str = "specs_assets/dog_cafe.openapi.yml";
+const DOG_CAFE_PATH: &str = "specs_assets/dog_cafe.openapi.json";
 
 fn bench_load_taskflow(c: &mut Criterion) {
     let path = std::path::Path::new(TASKFLOW_PATH);

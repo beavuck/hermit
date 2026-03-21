@@ -8,9 +8,14 @@ pub struct Args {
     #[arg(long, default_value_t = DEFAULT_PORT, env = "HERMIT_PORT")]
     pub port: u16,
 
+    /// A directory containing OpenAPI spec files to load.
+    /// The directory must exist and contain valid OpenAPI spec files only
+    #[arg(long, env = "HERMIT_SPECS_DIR", conflicts_with = "specs")]
+    pub specs_dir: Option<std::path::PathBuf>,
+
     /// One or more OpenAPI spec files to load.
     /// Can be specified multiple times, as a space-separated list, or via HERMIT_SPECS (comma-separated).
-    #[arg(long, num_args = 1.., env = "HERMIT_SPECS", value_delimiter = ',')]
+    #[arg(long, num_args = 0.., env = "HERMIT_SPECS", value_delimiter = ',', conflicts_with = "specs_dir")]
     pub specs: Vec<std::path::PathBuf>,
 
     /// The minimum number of items to generate for array schemas.
@@ -35,6 +40,20 @@ impl Args {
                 "--min-items ({}) must not exceed --max-items ({})",
                 self.min_items, self.max_items
             ));
+        }
+        if self.specs.is_empty() && self.specs_dir.is_none() {
+            return Err("either --specs or --specs-dir must be provided".to_string());
+        }
+        if let Some(dir) = &self.specs_dir {
+            if !dir.exists() {
+                return Err(format!("--specs-dir '{}' does not exist", dir.display()));
+            }
+            if !dir.is_dir() {
+                return Err(format!(
+                    "--specs-dir '{}' is not a directory",
+                    dir.display()
+                ));
+            }
         }
         Ok(())
     }
@@ -167,5 +186,41 @@ mod tests {
         ])
         .unwrap();
         assert!(args.validate().is_ok());
+    }
+
+    #[test]
+    fn specs_dir_is_accepted() {
+        let dir_name = "specs_assets";
+        let args = Args::try_parse_from(["hermit", "--specs-dir", dir_name]).unwrap();
+        assert_eq!(args.specs_dir, Some(std::path::PathBuf::from(dir_name)));
+    }
+
+    #[test]
+    fn specs_dir_and_specs_are_mutually_exclusive() {
+        assert!(
+            Args::try_parse_from(["hermit", "--specs", "a.yaml", "--specs-dir", "some/dir"])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn validate_rejects_when_neither_specs_nor_specs_dir_is_provided() {
+        let args = Args::try_parse_from(["hermit"]).unwrap();
+        assert!(args.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_specs_dir_that_does_not_exist() {
+        let args =
+            Args::try_parse_from(["hermit", "--specs-dir", "/nonexistent/path/to/specs"]).unwrap();
+        assert!(args.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_specs_dir_pointing_to_a_non_directory_element() {
+        let args =
+            Args::try_parse_from(["hermit", "--specs-dir", "specs_assets/taskflow.openapi.yml"])
+                .unwrap();
+        assert!(args.validate().is_err());
     }
 }

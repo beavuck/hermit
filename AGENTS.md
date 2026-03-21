@@ -1,3 +1,8 @@
+## Environment
+
+When a tool, command, or workflow behaves unexpectedly (sandbox restrictions, hooks rewriting output, missing binaries),
+stop immediately and explain what's happening to the user — never attempt workarounds or try to bypass the environment.
+
 ## Behavior
 
 Banish the word "perfect" from your vocab. Don't make a show of being confident -- the user values truth over
@@ -30,6 +35,8 @@ Before taking these actions, STOP and explain the situation to the user, then le
     - Choosing between different implementation approaches (e.g., StateFlow vs LiveData)
     - Changing public APIs / endpoints
     - Large refactorings not explicitly requested
+    - This includes small decisions scoped within a feature (e.g., which module to put new code in, what the public API
+      of a new method looks like) — present options and ask before writing any code.
 
 - **Deleting any existing code** (except when replacing with new implementation)
     - Removing unused functions, classes, or files
@@ -45,7 +52,7 @@ Before using Edit or Write tools, verify:
 
 - [ ] Am I deleting test code? → Ask user first
 - [ ] Am I suppressing a warning? → Ask user first
-- [ ] Am I making an architectural choice? → Ask user first
+- [ ] Am I making an architectural choice, even a small one (which module, what method signature)? → Ask user first
 - [ ] Am I about to delete code I didn't write in this session? → Explain and ask
 
 ## Working in small shippable units
@@ -55,6 +62,9 @@ When given a specific task, do only that task. Do not:
 - Implement additional related methods
 - Try to complete the entire feature
 - Make assumptions about what else needs to be done
+
+Stop and ask for feedback at every natural checkpoint — after reading code, after writing tests, after each small
+implementation step. Don't chain multiple steps together without a confirmation in between.
 
 Let the user test each small unit before moving to the next. This allows:
 
@@ -79,13 +89,18 @@ Let the user test each small unit before moving to the next. This allows:
   fair enough, but apart from that, duplicating code or logic should be banned.
 - Don't hardcode magic values. If a value has a specific meaning, it should be defined as a constant with a descriptive
   name.
-- Practice TDD: Write failing tests first. Then write code to make them pass. But don't test for
+- Practice TDD: Write failing tests first, then stop and let the user confirm they fail before writing any
+  implementation. Then write code to make them pass. But don't test for
   specific behavior within a method -- test for the observable effects of that behavior. Input in,
   output out.
     - Write unit tests for all core logic. Use Integration tests for cross-cutting concerns. API tests via
       Bruno / bru can also be useful for that.
+    - When writing tests for functions or types that don't exist yet, add minimal stubs (e.g. `todo!()` bodies,
+      empty structs, placeholder fields) so the project compiles and the tests can run and fail at runtime.
 - Use meaningful names. Choose clear and descriptive names for variables, functions, classes, and
   modules.
+- Phrase `expect`, `assert`, and error messages in the form "X should Y" — it describes the happy
+  path and doubles as a readable failure message (e.g. `"spec file should be readable"`).
 - Perform minimal changes necessary to implement features or fix bugs. Avoid large refactorings
   unless asked for.
 - Never suppress any warnings -- let a human do so if they deem it necessary.

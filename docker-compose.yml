@@ -36,7 +36,7 @@ services:
   hermit:
     image: beavuck/hermit:latest
     environment:
-      HERMIT_SPECS: specs/taskflow.openapi.yml,specs/dog_cafe.openapi.yml
+      HERMIT_SPECS_DIR: specs
       HERMIT_IGNORE_EXAMPLES: true
     ports:
       - "8532:8532"

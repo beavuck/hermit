@@ -35,19 +35,27 @@ To also push, you may add `--push`. But the CI pipeline should take care of that
 
 ## Running
 
-Mount your OpenAPI spec files into `/specs` and point `HERMIT_SPECS` at them:
+Mount your OpenAPI spec files into `/specs`. Use `HERMIT_SPECS_DIR` to load all files in a directory:
 
 ```sh
 docker run --rm \
   -p 8532:8532 \
   -v ./specs_assets:/specs:ro \
-  -e HERMIT_SPECS=specs/taskflow.openapi.yml,specs/dog_cafe.openapi.yml \
+  -e HERMIT_SPECS_DIR=specs \
   beavuck/hermit
 ```
 
-Replace `specs_assets` with the path to your spec files.
+Or use `HERMIT_SPECS` to load specific files (comma-separated):
 
-Replace the `*.openapi.yml` files with your actual files.
+```sh
+docker run --rm \
+  -p 8532:8532 \
+  -v ./specs_assets:/specs:ro \
+  -e HERMIT_SPECS=specs/taskflow.openapi.yml,specs/dog_cafe.openapi.json \
+  beavuck/hermit
+```
+
+`HERMIT_SPECS_DIR` and `HERMIT_SPECS` are mutually exclusive — exactly one must be provided.
 
 ## Environment variables
 
@@ -55,12 +63,14 @@ All CLI flags are also available as environment variables. CLI args take precede
 
 | Variable                 | CLI equivalent      | Default      |
 |--------------------------|---------------------|--------------|
+| `HERMIT_SPECS_DIR`       | `--specs-dir`       | *(required)* |
 | `HERMIT_SPECS`           | `--specs`           | *(required)* |
 | `HERMIT_PORT`            | `--port`            | `8532`       |
 | `HERMIT_MIN_ITEMS`       | `--min-items`       | `1`          |
 | `HERMIT_MAX_ITEMS`       | `--max-items`       | `20`         |
 | `HERMIT_IGNORE_EXAMPLES` | `--ignore-examples` | `false`      |
 
+`HERMIT_SPECS_DIR` and `HERMIT_SPECS` are mutually exclusive — exactly one must be provided.
 `HERMIT_SPECS` accepts a comma-separated list of paths.
 
 ## docker-compose
@@ -71,7 +81,7 @@ Here is a docker-compose example of a typical Hermit setup:
   hermit:
     image: beavuck/hermit:latest
     environment:
-      HERMIT_SPECS: specs/taskflow.openapi.yml,specs/dog_cafe.openapi.yml
+      HERMIT_SPECS_DIR: specs
       HERMIT_IGNORE_EXAMPLES: true
     ports:
       - "8532:8532"

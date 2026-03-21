@@ -6,8 +6,6 @@ info:
 http:
   method: POST
   url: "{{DOG_CAFE_BASE_URL}}/orders"
-  headers:
-    Content-Type: application/json
   body:
     type: json
     data: |-

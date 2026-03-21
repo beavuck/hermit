@@ -6,8 +6,6 @@ info:
 http:
   method: POST
   url: "{{TASKFLOW_BASE_URL}}/labels"
-  headers:
-    Content-Type: application/json
   body:
     type: json
     data: |-
@@ -21,8 +19,7 @@ http:
 runtime:
   scripts:
     - type: after-response
-      code: |-
-        bru.setVar("CREATED_LABEL_ID", res.body.id);
+      code: bru.setVar("CREATED_LABEL_ID", res.body.id);
   assertions:
     - expression: res.status
       operator: eq

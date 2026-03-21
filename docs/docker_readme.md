@@ -7,25 +7,27 @@ Supports `linux/amd64` and `linux/arm64`.
 
 ## Quick start
 
+Mount your specs directory and point `HERMIT_SPECS_DIR` at it:
+
 ```sh
 docker run --rm \
   -p 8532:8532 \
   -v ./your-specs:/specs:ro \
-  -e HERMIT_SPECS=specs/your-api.openapi.yml \
+  -e HERMIT_SPECS_DIR=specs \
   beavuck/hermit
 ```
 
 Your mock server is now running on port `8532`.
 
-## Loading multiple specs
+## Loading specific files
 
-Hermit can serve multiple APIs at once — just pass a comma-separated list:
+To load individual files rather than a whole directory, use `HERMIT_SPECS` with a comma-separated list:
 
 ```sh
 docker run --rm \
   -p 8532:8532 \
   -v ./your-specs:/specs:ro \
-  -e HERMIT_SPECS=specs/users-api.openapi.yml,specs/orders-api.openapi.yml \
+  -e HERMIT_SPECS=specs/users-api.openapi.yml \
   beavuck/hermit
 ```
 
@@ -44,13 +46,16 @@ hermit:
 
 ## Environment variables
 
-| Variable                 | Default      | Description                         |
-|--------------------------|--------------|-------------------------------------|
-| `HERMIT_SPECS`           | *(required)* | Comma-separated paths to spec files |
-| `HERMIT_PORT`            | `8532`       | Port to listen on                   |
-| `HERMIT_MIN_ITEMS`       | `1`          | Minimum items in generated arrays   |
-| `HERMIT_MAX_ITEMS`       | `20`         | Maximum items in generated arrays   |
-| `HERMIT_IGNORE_EXAMPLES` | `false`      | Ignore `example` fields in schemas  |
+| Variable                 | Default      | Description                                    |
+|--------------------------|--------------|------------------------------------------------|
+| `HERMIT_SPECS_DIR`       | *(required)* | Path to a directory of OpenAPI spec files      |
+| `HERMIT_SPECS`           | *(required)* | Comma-separated paths to individual spec files |
+| `HERMIT_PORT`            | `8532`       | Port to listen on                              |
+| `HERMIT_MIN_ITEMS`       | `1`          | Minimum items in generated arrays              |
+| `HERMIT_MAX_ITEMS`       | `20`         | Maximum items in generated arrays              |
+| `HERMIT_IGNORE_EXAMPLES` | `false`      | Ignore `example` fields in schemas             |
+
+`HERMIT_SPECS_DIR` and `HERMIT_SPECS` are mutually exclusive — exactly one must be provided.
 
 ## How responses are generated
 
