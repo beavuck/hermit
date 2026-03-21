@@ -74,6 +74,20 @@ impl CrudStore {
     }
 }
 
+pub fn json_value_to_string(v: &Value) -> String {
+    v.as_str()
+        .map(String::from)
+        .unwrap_or_else(|| v.to_string())
+}
+
+fn new_id_like(existing: &Value) -> Option<Value> {
+    match existing {
+        Value::Number(_) => Some(Value::Number(rand::rng().random::<u32>().into())),
+        Value::String(_) => Some(Value::String(new_uuid())),
+        _ => None,
+    }
+}
+
 pub fn new_uuid() -> String {
     let mut rng = rand::rng();
     format!(
@@ -109,8 +123,7 @@ pub fn seed_collection(store: &mut CrudStore, collection_path: &str, mock_body: 
     for item in items {
         let id = item
             .get("id")
-            .and_then(|v| v.as_str())
-            .map(String::from)
+            .map(json_value_to_string)
             .unwrap_or_else(new_uuid);
         let item_path = format!("{}/{}", collection_path, id);
         store.seed_item(&item_path, item);
@@ -137,15 +150,7 @@ pub fn fill_to_count_with_generator(
     generator: impl Fn() -> Value,
 ) -> Vec<Value> {
     let target = rand::rng().random_range(min..=max);
-    (0..target)
-        .map(|_| {
-            let mut item = generator();
-            if let Some(obj) = item.as_object_mut() {
-                obj.insert("id".to_string(), Value::String(new_uuid()));
-            }
-            item
-        })
-        .collect()
+    (0..target).map(|_| generator()).collect()
 }
 
 pub fn fill_to_count(template_items: Vec<Value>, min: usize, max: usize) -> Vec<Value> {
@@ -156,8 +161,10 @@ pub fn fill_to_count(template_items: Vec<Value>, min: usize, max: usize) -> Vec<
     (0..target)
         .map(|i| {
             let mut item = template_items[i % template_items.len()].clone();
-            if let Some(obj) = item.as_object_mut() {
-                obj.insert("id".to_string(), Value::String(new_uuid()));
+            if let Some(obj) = item.as_object_mut()
+                && let Some(new_id) = obj.get("id").and_then(new_id_like)
+            {
+                obj.insert("id".to_string(), new_id);
             }
             item
         })
@@ -330,6 +337,23 @@ mod tests {
         assert_eq!(result[0]["id"], json!("x"));
     }
 
+    // --- json_value_to_id ---
+
+    #[test]
+    fn json_value_to_id_returns_string_value_without_quotes() {
+        assert_eq!(json_value_to_string(&json!("foo")), "foo");
+    }
+
+    #[test]
+    fn json_value_to_id_returns_integer_as_string() {
+        assert_eq!(json_value_to_string(&json!(42)), "42");
+    }
+
+    #[test]
+    fn json_value_to_id_returns_bool_as_string() {
+        assert_eq!(json_value_to_string(&json!(true)), "true");
+    }
+
     // --- new_uuid ---
 
     #[test]
@@ -384,11 +408,19 @@ mod tests {
     }
 
     #[test]
-    fn fill_to_count_assigns_distinct_ids_to_replicated_items() {
-        let items = vec![json!({"id": "a", "name": "x"})];
+    fn fill_to_count_generates_fresh_ids_of_same_type_as_template() {
+        let items = vec![json!({"id": 42, "name": "x"})];
         let result = fill_to_count(items, 3, 3);
-        let ids: Vec<_> = result.iter().filter_map(|v| v["id"].as_str()).collect();
+        assert!(
+            result.iter().all(|v| v["id"].is_number()),
+            "replicated items should have numeric ids matching the template type"
+        );
+        let ids: Vec<_> = result.iter().map(|v| v["id"].as_u64()).collect();
         let unique: std::collections::HashSet<_> = ids.iter().collect();
-        assert_eq!(unique.len(), 3, "expected 3 distinct ids, got {ids:?}");
+        assert_eq!(
+            unique.len(),
+            3,
+            "replicated items should have distinct ids, got {ids:?}"
+        );
     }
 }

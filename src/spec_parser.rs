@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 use yaml_serde::Value;
@@ -76,13 +76,25 @@ fn flatten_inner(schema: &Value, root: &Value, forced: Option<&str>) -> Value {
     try_flatten_composite(schema, root, forced).unwrap_or_else(|| schema.clone())
 }
 
+thread_local! {
+    static VISITING_REFS: std::cell::RefCell<HashSet<String>> =
+        std::cell::RefCell::new(HashSet::new());
+}
+
 fn flatten_ref(schema: &Value, root: &Value, forced: Option<&str>) -> Value {
-    schema
-        .get("$ref")
-        .and_then(|v| v.as_str())
-        .and_then(|ref_str| resolve_ref(root, ref_str))
+    let Some(ref_str) = schema.get("$ref").and_then(|v| v.as_str()) else {
+        return schema.clone();
+    };
+    let already_visiting = VISITING_REFS.with(|v| v.borrow().contains(ref_str));
+    if already_visiting {
+        return schema.clone();
+    }
+    VISITING_REFS.with(|v| v.borrow_mut().insert(ref_str.to_string()));
+    let result = resolve_ref(root, ref_str)
         .map(|resolved| flatten_inner(resolved, root, forced))
-        .unwrap_or_else(|| schema.clone())
+        .unwrap_or_else(|| schema.clone());
+    VISITING_REFS.with(|v| v.borrow_mut().remove(ref_str));
+    result
 }
 
 fn flatten_all_of(schema: &Value, root: &Value, forced: Option<&str>) -> Value {
@@ -1027,5 +1039,23 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("not_openapi.yaml"), "foo: bar").unwrap();
         load_dir(&dir);
+    }
+
+    // --- circular $ref cycle detection ---
+
+    #[test]
+    fn flatten_schema_does_not_overflow_on_direct_circular_ref() {
+        let root = yaml("Node:\n  $ref: '#/Node'");
+        let schema = yaml("$ref: '#/Node'");
+        let flat = flatten_schema(&schema, &root);
+        assert!(flat.is_mapping(), "flat schema should be a mapping value");
+    }
+
+    #[test]
+    fn flatten_schema_does_not_overflow_on_indirect_circular_ref() {
+        let root = yaml("A:\n  $ref: '#/B'\nB:\n  $ref: '#/A'");
+        let schema = yaml("$ref: '#/A'");
+        let flat = flatten_schema(&schema, &root);
+        assert!(flat.is_mapping(), "flat schema should be a mapping value");
     }
 }

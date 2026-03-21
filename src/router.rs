@@ -14,7 +14,7 @@ use crate::http_method::HttpMethod;
 use crate::resource_generator::ignore_examples;
 use crate::resource_store::{
     CrudStore, build_collection_response, extract_items_from_mock, fill_to_count,
-    fill_to_count_with_generator, is_item_pattern, new_uuid,
+    fill_to_count_with_generator, is_item_pattern, json_value_to_string, new_uuid,
 };
 use crate::spec_parser::RouteConfig;
 
@@ -182,8 +182,7 @@ fn get_collection(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Respon
         for item in filled {
             let id = item
                 .get("id")
-                .and_then(|v| v.as_str())
-                .map(String::from)
+                .map(json_value_to_string)
                 .unwrap_or_else(new_uuid);
             store.seed_item(&format!("{}/{}", concrete, id), item);
         }
@@ -222,22 +221,22 @@ fn post_item(
             .or_else(|| variants.values().next())
             .cloned()
     } else if location_only {
-        let now = chrono::Utc::now().to_rfc3339();
-        Some(serde_json::json!({
-            "id": new_uuid(),
-            "createdAt": now,
-            "updatedAt": now,
-        }))
+        Some(serde_json::Value::Object(serde_json::Map::new()))
     } else {
         cfg.body.clone()
     };
 
-    let new_item = merge_excluding(base, request_fields, &cfg.read_only_fields);
+    let mut new_item = merge_excluding(base, request_fields, &cfg.read_only_fields);
     let id = new_item
         .get("id")
-        .and_then(|v| v.as_str())
-        .map(String::from)
+        .map(json_value_to_string)
         .unwrap_or_else(new_uuid);
+
+    if location_only && let Some(obj) = new_item.as_object_mut() {
+        obj.entry("id")
+            .or_insert(serde_json::Value::String(id.clone()));
+    }
+
     let item_path = format!("{}/{}", collection, id);
 
     let mut store = state.store.write().unwrap();
@@ -940,7 +939,15 @@ mod tests {
         let body = response_json(get_response).await;
         assert_eq!(body["name"], json!("thing"));
         assert!(body["id"].is_string());
-        assert!(body["createdAt"].is_string());
+        assert_eq!(
+            body["id"].as_str().unwrap(),
+            location.rsplit('/').next().unwrap(),
+            "body id should match the location path segment"
+        );
+        assert!(
+            body.get("createdAt").is_none(),
+            "invented fields should not be present"
+        );
     }
 
     #[tokio::test]

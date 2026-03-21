@@ -2,6 +2,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::constants::{BASE64_CHARS, DEFAULT_IGNORE_EXAMPLES, RANDOM_WORDS};
+use crate::resource_store::new_uuid;
 use crate::spec_parser::{flatten_schema, flatten_schema_forced};
 use rand::RngExt;
 use serde_json::Value as JsonValue;
@@ -196,14 +197,7 @@ fn string_for_format(fmt: &str, rng: &mut impl RngExt) -> String {
             rng.random_range(0u8..=59),
             rng.random_range(0u8..=59),
         ),
-        "uuid" => format!(
-            "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
-            rng.random::<u32>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u64>() & 0x0000_ffff_ffff_ffff,
-        ),
+        "uuid" => new_uuid(),
         "email" => format!("{}@{}.com", random_word(rng), random_word(rng)),
         "uri" => format!("https://{}.com/{}", random_word(rng), random_word(rng)),
         "hostname" => format!("{}.{}", random_word(rng), random_word(rng)),
