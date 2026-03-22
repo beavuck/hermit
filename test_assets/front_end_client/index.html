@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hermit — Projects</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background: #111;
+            color: #eee;
+        }
+
+        h1 {
+            color: #7dd3fc;
+        }
+
+        h2 {
+            color: #a5f3fc;
+            margin-top: 2rem;
+            border-bottom: 1px solid #333;
+            padding-bottom: .4rem;
+        }
+
+        label {
+            display: block;
+            margin: .4rem 0 .2rem;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        input {
+            background: #1e293b;
+            color: #eee;
+            border: 1px solid #334155;
+            padding: .4rem .6rem;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #0ea5e9;
+        }
+
+        button[type="submit"] {
+            margin-top: .6rem;
+            padding: .4rem 1rem;
+            background: #0ea5e9;
+            color: #000;
+            border: none;
+            cursor: pointer;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        button[type="submit"]:hover {
+            background: #38bdf8;
+        }
+
+        pre {
+            background: #0f172a;
+            padding: 1rem;
+            overflow: auto;
+            border-left: 3px solid #0ea5e9;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status {
+            font-size: .85rem;
+            color: #64748b;
+            margin-bottom: .3rem;
+        }
+
+        .ok {
+            color: #4ade80;
+        }
+
+        .err {
+            color: #f87171;
+        }
+    </style>
+</head>
+<body>
+<h1>Hermit — Projects</h1>
+<p style="color:#64748b">Talks to <code>http://127.0.0.1:8532</code>. Start Hermit with the taskflow spec before using
+    this page.</p>
+
+<h2>GET /projects</h2>
+<form id="form-get-projects">
+    <button type="submit">Send</button>
+</form>
+<div id="get-projects-out"></div>
+
+<h2>POST /projects</h2>
+<form id="form-post-project">
+    <label for="post-name">name</label>
+    <input id="post-name" value="My Project">
+    <label for="post-desc">description</label>
+    <input id="post-desc" value="A test project">
+    <label for="post-status">status</label>
+    <input id="post-status" value="active">
+    <button type="submit">Send</button>
+</form>
+<div id="post-project-out"></div>
+
+<h2>GET /projects/:id</h2>
+<form id="form-get-project">
+    <label for="get-id">id</label>
+    <input id="get-id" placeholder="paste an id from POST response">
+    <button type="submit">Send</button>
+</form>
+<div id="get-project-out"></div>
+
+<h2>PUT /projects/:id</h2>
+<form id="form-put-project">
+    <label for="put-id">id</label>
+    <input id="put-id" placeholder="paste an id">
+    <label for="put-name">name</label>
+    <input id="put-name" value="Updated Project">
+    <label for="put-desc">description</label>
+    <input id="put-desc" value="Updated via PUT">
+    <label for="put-status">status</label>
+    <input id="put-status" value="active">
+    <button type="submit">Send</button>
+</form>
+<div id="put-project-out"></div>
+
+<h2>DELETE /projects/:id</h2>
+<form id="form-delete-project">
+    <label for="delete-id">id</label>
+    <input id="delete-id" placeholder="paste an id">
+    <button type="submit">Send</button>
+</form>
+<div id="delete-project-out"></div>
+
+<script>
+    const BASE = 'http://127.0.0.1:8532';
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function render(targetId, promise) {
+        const out = document.getElementById(targetId);
+        try {
+            const res = await promise;
+            const text = await res.text();
+            const body = text ? JSON.parse(text) : null;
+            const statusClass = res.ok ? 'ok' : 'err';
+            out.innerHTML = `<div class="status ${statusClass}">${res.status} ${escapeHtml(res.statusText)}</div><pre>${body ? escapeHtml(JSON.stringify(body, null, 2)) : '(no body)'}</pre>`;
+        } catch (e) {
+            out.innerHTML = `<pre class="err">${escapeHtml(e)}</pre>`;
+        }
+    }
+
+    document.getElementById('form-get-projects').addEventListener('submit', (e) => {
+        e.preventDefault();
+        render('get-projects-out', fetch(`${BASE}/projects`));
+    });
+
+    document.getElementById('form-post-project').addEventListener('submit', (e) => {
+        e.preventDefault();
+        render('post-project-out', fetch(`${BASE}/projects`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: document.getElementById('post-name').value,
+                description: document.getElementById('post-desc').value,
+                status: document.getElementById('post-status').value,
+            }),
+        }));
+    });
+
+    document.getElementById('form-get-project').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('get-id').value.trim();
+        render('get-project-out', fetch(`${BASE}/projects/${id}`));
+    });
+
+    document.getElementById('form-put-project').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('put-id').value.trim();
+        render('put-project-out', fetch(`${BASE}/projects/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: document.getElementById('put-name').value,
+                description: document.getElementById('put-desc').value,
+                status: document.getElementById('put-status').value,
+            }),
+        }));
+    });
+
+    document.getElementById('form-delete-project').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('delete-id').value.trim();
+        render('delete-project-out', fetch(`${BASE}/projects/${id}`, {method: 'DELETE'}));
+    });
+</script>
+</body>
+</html>

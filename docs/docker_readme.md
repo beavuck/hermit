@@ -24,6 +24,7 @@ Your mock server is now running on port `8532`.
 ```yaml
 hermit:
   image: beavuck/hermit:latest
+  pull_policy: always
   environment:
     HERMIT_SPECS_DIR: specs
   ports:
@@ -46,14 +47,15 @@ beavuck/hermit
 
 ## Environment variables
 
-| Variable                 | Default      | Description                                    |
-|--------------------------|--------------|------------------------------------------------|
-| `HERMIT_SPECS_DIR`       | *(required)* | Path to a directory of OpenAPI spec files      |
-| `HERMIT_SPECS`           | *(required)* | Comma-separated paths to individual spec files |
-| `HERMIT_PORT`            | `8532`       | Port to listen on                              |
-| `HERMIT_MIN_ITEMS`       | `1`          | Minimum items in generated arrays              |
-| `HERMIT_MAX_ITEMS`       | `20`         | Maximum items in generated arrays              |
-| `HERMIT_IGNORE_EXAMPLES` | `false`      | Ignore `example` fields in schemas             |
+| Variable                        | Default      | Description                                                        |
+|---------------------------------|--------------|--------------------------------------------------------------------|
+| `HERMIT_SPECS_DIR`              | *(required)* | Path to a directory of OpenAPI spec files                          |
+| `HERMIT_SPECS`                  | *(required)* | Comma-separated paths to individual spec files                     |
+| `HERMIT_PORT`                   | `8532`       | Port to listen on                                                  |
+| `HERMIT_MIN_ITEMS`              | `1`          | Minimum items in generated arrays                                  |
+| `HERMIT_MAX_ITEMS`              | `20`         | Maximum items in generated arrays                                  |
+| `HERMIT_IGNORE_EXAMPLES`        | `false`      | Ignore `example` fields in schemas                                 |
+| `HERMIT_CORS_ALLOWED_ORIGINS`   | `*`          | Allowed CORS origins; `*` for all, or comma-separated list         |
 
 `HERMIT_SPECS_DIR` and `HERMIT_SPECS` are mutually exclusive -- exactly one must be provided.
 

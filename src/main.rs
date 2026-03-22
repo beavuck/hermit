@@ -17,8 +17,11 @@ async fn main() {
         Some(ref dir) => spec_loader::load_dir(dir),
         None => spec_loader::load_all(&args.specs),
     };
-    let app = router::build_with_bounds(routes, args.min_items, args.max_items)
-        .layer(axum::middleware::from_fn(log_request));
+    let app = router::with_cors(
+        router::build_with_bounds(routes, args.min_items, args.max_items),
+        &args.cors_allowed_origins,
+    )
+    .layer(axum::middleware::from_fn(log_request));
 
     let addr = (constants::BIND_ADDR, args.port);
     let listener = tokio::net::TcpListener::bind(addr)

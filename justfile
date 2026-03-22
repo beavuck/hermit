@@ -15,7 +15,7 @@ bench-ci:
     cargo nextest bench --bench startup_bench --bench generate_bench --bench request_bench -- --save-baseline change
 
 test:
-    cargo nextest run
+    cargo nextest run --no-fail-fast
 
 lint:
     cargo clippy --fix --all-targets --allow-dirty --allow-staged

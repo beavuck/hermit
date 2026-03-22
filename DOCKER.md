@@ -62,14 +62,15 @@ docker run --rm --pull=always \
 
 All CLI flags are also available as environment variables. CLI args take precedence over env vars.
 
-| Variable                 | CLI equivalent      | Default      |
-|--------------------------|---------------------|--------------|
-| `HERMIT_SPECS_DIR`       | `--specs-dir`       | *(required)* |
-| `HERMIT_SPECS`           | `--specs`           | *(required)* |
-| `HERMIT_PORT`            | `--port`            | `8532`       |
-| `HERMIT_MIN_ITEMS`       | `--min-items`       | `1`          |
-| `HERMIT_MAX_ITEMS`       | `--max-items`       | `20`         |
-| `HERMIT_IGNORE_EXAMPLES` | `--ignore-examples` | `false`      |
+| Variable                        | CLI equivalent           | Default      |
+|---------------------------------|--------------------------|--------------|
+| `HERMIT_SPECS_DIR`              | `--specs-dir`            | *(required)* |
+| `HERMIT_SPECS`                  | `--specs`                | *(required)* |
+| `HERMIT_PORT`                   | `--port`                 | `8532`       |
+| `HERMIT_MIN_ITEMS`              | `--min-items`            | `1`          |
+| `HERMIT_MAX_ITEMS`              | `--max-items`            | `20`         |
+| `HERMIT_IGNORE_EXAMPLES`        | `--ignore-examples`      | `false`      |
+| `HERMIT_CORS_ALLOWED_ORIGINS`   | `--cors-allowed-origins` | `*`          |
 
 `HERMIT_SPECS_DIR` and `HERMIT_SPECS` are mutually exclusive -- exactly one must be provided.
 `HERMIT_SPECS` accepts a comma-separated list of paths.
@@ -81,6 +82,7 @@ Here is a docker-compose example of a typical Hermit setup:
 ```yaml
   hermit:
     image: beavuck/hermit:latest
+    pull_policy: always
     environment:
       HERMIT_SPECS_DIR: specs
       HERMIT_IGNORE_EXAMPLES: true

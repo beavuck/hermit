@@ -14,6 +14,9 @@ When in doubt, ask for clarification rather than making assumptions.
 
 Don't state a hypothesis as fact -- verify it first, or ask the user to verify if you can't.
 
+If the user reverts or removes something, treat that as a deliberate decision. Don't re-apply it silently -- if you
+believe it's wrong, say so explicitly and let them decide.
+
 Never ask the user to share secrets, tokens, passwords, or credentials -- instead, show the command with a placeholder
 (e.g. `<token>`) and let them fill it in themselves.
 

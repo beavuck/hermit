@@ -1,5 +1,25 @@
 use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS, DEFAULT_PORT};
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum CorsOrigins {
+    All,
+    List(Vec<String>),
+}
+
+impl std::str::FromStr for CorsOrigins {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "*" {
+            Ok(CorsOrigins::All)
+        } else {
+            Ok(CorsOrigins::List(
+                s.split(',').map(|o| o.to_string()).collect(),
+            ))
+        }
+    }
+}
+
 #[derive(clap::Parser)]
 pub struct Args {
     /// If running in a Docker container, this port number will be internal to the container.
@@ -31,6 +51,10 @@ pub struct Args {
     /// Skip `example` values from the spec and generate random data instead.
     #[arg(long, default_value_t = false, env = "HERMIT_IGNORE_EXAMPLES")]
     pub ignore_examples: bool,
+
+    /// Allowed CORS origins. Use `*` to allow all origins, or a comma-separated list of specific origins.
+    #[arg(long, default_value = "*", env = "HERMIT_CORS_ALLOWED_ORIGINS")]
+    pub cors_allowed_origins: CorsOrigins,
 }
 
 impl Args {
@@ -63,7 +87,7 @@ impl Args {
 mod tests {
     use clap::Parser;
 
-    use super::Args;
+    use super::{Args, CorsOrigins};
     use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS};
 
     #[test]
@@ -228,5 +252,49 @@ mod tests {
             Args::try_parse_from(["hermit", "--specs-dir", "specs_assets/taskflow.openapi.yml"])
                 .unwrap();
         assert!(args.validate().is_err());
+    }
+
+    // --- CORS allowed origins ---
+
+    #[test]
+    fn cors_allowed_origins_defaults_to_wildcard() {
+        let args = Args::try_parse_from(["hermit", "--specs", "a.yaml"]).unwrap();
+        assert_eq!(
+            args.cors_allowed_origins,
+            CorsOrigins::All,
+            "cors_allowed_origins should default to CorsOrigins::All"
+        );
+    }
+
+    #[test]
+    fn cors_allowed_origins_accepts_wildcard_explicitly() {
+        let args =
+            Args::try_parse_from(["hermit", "--specs", "a.yaml", "--cors-allowed-origins", "*"])
+                .unwrap();
+        assert_eq!(
+            args.cors_allowed_origins,
+            CorsOrigins::All,
+            "cors_allowed_origins should be CorsOrigins::All when * is passed"
+        );
+    }
+
+    #[test]
+    fn cors_allowed_origins_accepts_a_list() {
+        let args = Args::try_parse_from([
+            "hermit",
+            "--specs",
+            "a.yaml",
+            "--cors-allowed-origins",
+            "http://localhost:3000,http://example.com",
+        ])
+        .unwrap();
+        assert_eq!(
+            args.cors_allowed_origins,
+            CorsOrigins::List(vec![
+                "http://localhost:3000".to_string(),
+                "http://example.com".to_string(),
+            ]),
+            "cors_allowed_origins should be CorsOrigins::List with the given origins"
+        );
     }
 }

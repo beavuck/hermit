@@ -9,6 +9,7 @@ use axum::{
     routing::MethodRouter,
 };
 
+use crate::cli::CorsOrigins;
 use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS};
 use crate::http_method::HttpMethod;
 use crate::resource_generator::ignore_examples;
@@ -39,6 +40,23 @@ impl Default for AppState {
             max_items: DEFAULT_MAX_ITEMS,
         }
     }
+}
+
+pub fn with_cors(router: Router, origins: &CorsOrigins) -> Router {
+    let cors = match origins {
+        CorsOrigins::All => tower_http::cors::CorsLayer::permissive(),
+        CorsOrigins::List(list) => {
+            let values: Vec<axum::http::HeaderValue> = list
+                .iter()
+                .map(|o| o.parse().expect("origin should be a valid header value"))
+                .collect();
+            tower_http::cors::CorsLayer::new()
+                .allow_origin(tower_http::cors::AllowOrigin::list(values))
+                .allow_methods(tower_http::cors::Any)
+                .allow_headers(tower_http::cors::Any)
+        }
+    };
+    router.layer(cors)
 }
 
 pub fn build(configs: Vec<RouteConfig>) -> Router {
@@ -1326,5 +1344,93 @@ mod tests {
         .await;
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response_json(response).await.as_array().unwrap().len(), 2);
+    }
+
+    // --- CORS ---
+
+    use super::with_cors;
+    use crate::cli::CorsOrigins;
+
+    #[tokio::test]
+    async fn cors_wildcard_allows_any_origin() {
+        let app = with_cors(
+            build(vec![route(HttpMethod::Get, "/items", 200, Some(json!({})))]),
+            &CorsOrigins::All,
+        );
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/items")
+                .header("origin", "http://whatever.test")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .map(|v| v.to_str().unwrap()),
+            Some("*"),
+            "access-control-allow-origin should be * for CorsOrigins::All"
+        );
+    }
+
+    #[tokio::test]
+    async fn cors_list_reflects_matching_origin() {
+        let origin = "http://localhost:3000";
+        let app = with_cors(
+            build(vec![route(HttpMethod::Get, "/items", 200, Some(json!({})))]),
+            &CorsOrigins::List(vec![origin.to_string()]),
+        );
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/items")
+                .header("origin", origin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .map(|v| v.to_str().unwrap()),
+            Some(origin),
+            "access-control-allow-origin should reflect the matched origin"
+        );
+    }
+
+    #[tokio::test]
+    async fn cors_preflight_with_wildcard_returns_200() {
+        let app = with_cors(
+            build(vec![route(HttpMethod::Get, "/items", 200, Some(json!({})))]),
+            &CorsOrigins::All,
+        );
+        let response = send(
+            app,
+            Request::builder()
+                .method(Method::OPTIONS)
+                .uri("/items")
+                .header("origin", "http://whatever.test")
+                .header("access-control-request-method", "GET")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "CORS preflight should return 200"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("access-control-allow-origin")
+                .map(|v| v.to_str().unwrap()),
+            Some("*"),
+            "CORS preflight should return access-control-allow-origin: *"
+        );
     }
 }

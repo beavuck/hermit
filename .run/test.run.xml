@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
     <configuration default="false" name="test" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
         <option name="buildProfileId" value="test"/>
-        <option name="command" value="nextest run"/>
+        <option name="command" value="nextest run --no-fail-fast"/>
         <option name="workingDirectory" value="file://$PROJECT_DIR$"/>
         <envs/>
         <option name="emulateTerminal" value="true"/>
