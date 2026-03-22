@@ -1,5 +1,5 @@
+use beavuck_hermit::{spec_loader, spec_parser};
 use criterion::{Criterion, criterion_group, criterion_main};
-use hermit::{spec_loader, spec_parser};
 
 const TASKFLOW_PATH: &str = "specs_assets/taskflow.openapi.yml";
 const DOG_CAFE_PATH: &str = "specs_assets/dog_cafe.openapi.json";

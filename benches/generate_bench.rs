@@ -1,5 +1,5 @@
+use beavuck_hermit::{resource_generator, spec_loader};
 use criterion::{Criterion, criterion_group, criterion_main};
-use hermit::{resource_generator, spec_loader};
 
 const SPEC_PATH: &str = "specs_assets/taskflow.openapi.yml";
 

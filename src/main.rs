@@ -1,8 +1,9 @@
 // not unit-testable, the other unit tests and the API tests do a decent job overall though
 
 #![forbid(unsafe_code)]
+use beavuck_hermit::resource_generator::set_ignore_examples;
+use beavuck_hermit::{cli, constants, router, spec_loader};
 use clap::Parser;
-use hermit::{cli, constants, router, spec_loader};
 
 #[cfg_attr(test, mutants::skip)] // not tested
 #[tokio::main]
@@ -12,7 +13,7 @@ async fn main() {
         eprintln!("error: {e}");
         std::process::exit(1);
     });
-    hermit::resource_generator::set_ignore_examples(args.ignore_examples);
+    set_ignore_examples(args.ignore_examples);
     let routes = match args.specs_dir {
         Some(ref dir) => spec_loader::load_dir(dir),
         None => spec_loader::load_all(&args.specs),

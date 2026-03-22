@@ -3,13 +3,17 @@
 !Cargo.toml
 !Cargo.lock
 !src/
+!docs/
 !benches/
 
 # Deny list (safety net)
 **/.env
 **/.env.*
-**/secrets
+**/*secrets*
+**/*credentials*
+**/*private*
 **/*.pem
 **/*.key
 **/*.p12
 **/*.pfx
+.git/

@@ -113,6 +113,10 @@ Fields marked `readOnly: true` in the schema are never overridden by request bod
 
 See [install.md](docs/install.md).
 
+## 📦 🦀 Install and run from Cargo
+
+See [cargo.md](docs/cargo.md).
+
 ## 🚀 Quick start
 
 Run Hermit against your spec (replace the path with your actual spec file):

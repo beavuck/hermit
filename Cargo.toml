@@ -1,6 +1,6 @@
 [package]
-name = "hermit"
-version = "1.4.1"
+name = "beavuck-hermit"
+version = "1.4.2"
 edition = "2024"
 license-file = "UNLICENSE"
 homepage = "https://gitlab.com/beavuck-services/hermit"
@@ -9,7 +9,7 @@ readme = "README.md"
 description = "OpenAPI mock server -- serve realistic responses from any OpenAPI spec"
 keywords = ["openapi", "mock", "mock-server", "cli"]
 categories = ["command-line-utilities", "web-programming", "development-tools::testing"]
-include = ["src/**/*", "README.md", "UNLICENSE", "PRIVACY.md"]
+include = ["src/**/*", "README.md", "UNLICENSE", "PRIVACY.md", "docs/**/*"]
 
 [dependencies]
 tokio = { version = "1.50.0", features = ["macros", "net", "rt-multi-thread", "sync", "signal"] }
@@ -28,6 +28,10 @@ tower = { version = "0.5.3", features = ["util"] }
 http-body-util = "0.1.3"
 criterion = { version = "0.8.2", features = ["html_reports"] }
 regex = "1.12.3"
+
+[[bin]]
+name = "hermit"
+path = "src/main.rs"
 
 [[bench]]
 name = "startup_bench"

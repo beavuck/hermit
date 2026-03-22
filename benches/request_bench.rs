@@ -1,7 +1,7 @@
 use axum::body::Body;
 use axum::http::Request;
+use beavuck_hermit::{router, spec_loader, spec_parser};
 use criterion::{Criterion, criterion_group, criterion_main};
-use hermit::{router, spec_loader, spec_parser};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
