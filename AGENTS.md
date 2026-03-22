@@ -1,7 +1,7 @@
 ## Environment
 
 When a tool, command, or workflow behaves unexpectedly (sandbox restrictions, hooks rewriting output, missing binaries),
-stop immediately and explain what's happening to the user — never attempt workarounds or try to bypass the environment.
+stop immediately and explain what's happening to the user -- never attempt workarounds or try to bypass the environment.
 
 ## Behavior
 
@@ -12,7 +12,7 @@ Don't make a show of being skeptical either, just act with a critical mindset.
 
 When in doubt, ask for clarification rather than making assumptions.
 
-Never ask the user to share secrets, tokens, passwords, or credentials — instead, show the command with a placeholder
+Never ask the user to share secrets, tokens, passwords, or credentials -- instead, show the command with a placeholder
 (e.g. `<token>`) and let them fill it in themselves.
 
 ## Critical Rules - Get Approval First
@@ -36,14 +36,14 @@ Before taking these actions, STOP and explain the situation to the user, then le
     - Changing public APIs / endpoints
     - Large refactorings not explicitly requested
     - This includes small decisions scoped within a feature (e.g., which module to put new code in, what the public API
-      of a new method looks like) — present options and ask before writing any code.
+      of a new method looks like) -- present options and ask before writing any code.
 
 - **Deleting any existing code** (except when replacing with new implementation)
     - Removing unused functions, classes, or files
     - Let the user decide if something is truly unused
 
 - **Debugging loops**
-    - After two failed attempts at the same fix, stop and explain the situation to the user before trying again — don't
+    - After two failed attempts at the same fix, stop and explain the situation to the user before trying again -- don't
       escalate unilaterally; the root cause is likely in a different layer than where you've been looking
 
 ## Pre-Action Checklist
@@ -63,7 +63,7 @@ When given a specific task, do only that task. Do not:
 - Try to complete the entire feature
 - Make assumptions about what else needs to be done
 
-Stop and ask for feedback at every natural checkpoint — after reading code, after writing tests, after each small
+Stop and ask for feedback at every natural checkpoint -- after reading code, after writing tests, after each small
 implementation step. Don't chain multiple steps together without a confirmation in between.
 
 Let the user test each small unit before moving to the next. This allows:
@@ -75,7 +75,7 @@ Let the user test each small unit before moving to the next. This allows:
 
 ## Coding style and practices
 
-- Avoid boolean parameters — they signal a function has more than one responsibility; offer the user a few options
+- Avoid boolean parameters -- they signal a function has more than one responsibility; offer the user a few options
   instead, and let the user give an open answer in case none of your options are chosen.
 - Practice SOLID
     - S: Single Responsibility Principle (each class, each method, should have one reason to change)
@@ -99,7 +99,7 @@ Let the user test each small unit before moving to the next. This allows:
       empty structs, placeholder fields) so the project compiles and the tests can run and fail at runtime.
 - Use meaningful names. Choose clear and descriptive names for variables, functions, classes, and
   modules.
-- Phrase `expect`, `assert`, and error messages in the form "X should Y" — it describes the happy
+- Phrase `expect`, `assert`, and error messages in the form "X should Y" -- it describes the happy
   path and doubles as a readable failure message (e.g. `"spec file should be readable"`).
 - Perform minimal changes necessary to implement features or fix bugs. Avoid large refactorings
   unless asked for.

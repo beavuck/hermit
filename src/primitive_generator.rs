@@ -6,7 +6,7 @@ use crate::constants::{BASE64_CHARS, RANDOM_WORDS};
 use crate::resource_store::new_uuid;
 
 // The min-length padding loop adds whole words at a time, always overshooting
-// the target — making the exact `<` vs `<=` boundary unobservable. Truncation
+// the target -- making the exact `<` vs `<=` boundary unobservable. Truncation
 // at max_len is likewise a no-op when the string is already exactly max_len.
 #[cfg_attr(test, mutants::skip)]
 pub(crate) fn primitive_fallback(schema: &YamlValue, schema_type: &str) -> JsonValue {

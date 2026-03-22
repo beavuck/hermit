@@ -216,7 +216,7 @@ fn schedule_object_children(flat: YamlValue, forced: Option<String>, frame_stack
 
     // Keys are queued front-to-back; eval frames are stacked in the same order so the frame
     // stack (LIFO) evaluates them back-to-front, landing values on value_stack in reverse.
-    // collect_object drains keys front-to-back and values top-to-bottom — the two reversals
+    // collect_object drains keys front-to-back and values top-to-bottom -- the two reversals
     // cancel, pairing each key with its value correctly.
     frame_stack.push(Frame::BuildObject { pending_keys });
     frame_stack.extend(eval_frames);

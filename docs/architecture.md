@@ -30,10 +30,10 @@ sequenceDiagram
     participant axum
     CLI ->> spec_parser: load_all(paths)
     par for each spec file (std::thread)
-        spec_parser ->> spec_parser: load(path) — read & parse YAML
+        spec_parser ->> spec_parser: load(path) -- read & parse YAML
         spec_parser ->> spec_parser: extract_routes(spec)
         note over spec_parser, resource_generator: For each (path, method) in spec.paths
-        spec_parser ->> resource_generator: generate(schema, spec, variant?) — rayon par_iter for discriminator variants
+        spec_parser ->> resource_generator: generate(schema, spec, variant?) -- rayon par_iter for discriminator variants
         resource_generator -->> spec_parser: serde_json::Value
     end
     spec_parser -->> CLI: Vec<RouteConfig>
@@ -47,12 +47,12 @@ is listening, every route has its response pre-built.
 
 ## Concurrency model
 
-| Layer | Mechanism | Purpose |
-|---|---|---|
-| Request handling | Tokio async runtime (multi-threaded) | Concurrent HTTP requests |
-| Spec loading | `std::thread::spawn` + `JoinHandle` | Parallel I/O across spec files |
-| Discriminator variant generation | `rayon::par_iter` | CPU-parallel value generation |
-| Shared state (`CrudStore`) | `Arc<RwLock<...>>` | Multiple readers / exclusive writers |
+| Layer                            | Mechanism                            | Purpose                              |
+|----------------------------------|--------------------------------------|--------------------------------------|
+| Request handling                 | Tokio async runtime (multi-threaded) | Concurrent HTTP requests             |
+| Spec loading                     | `std::thread::spawn` + `JoinHandle`  | Parallel I/O across spec files       |
+| Discriminator variant generation | `rayon::par_iter`                    | CPU-parallel value generation        |
+| Shared state (`CrudStore`)       | `Arc<RwLock<...>>`                   | Multiple readers / exclusive writers |
 
 The `RwLock` on `CrudStore` allows concurrent GET requests to read state simultaneously, while mutating methods (POST,
 PUT, PATCH, DELETE) take an exclusive write lock. PATCH acquires a read lock for the initial fetch and a separate write
@@ -86,23 +86,24 @@ pre-generating each discriminator variant for POST/PUT/PATCH routes.
 
 `resource_generator.rs` walks a flattened schema and produces a `serde_json::Value`. Resolution order:
 
-| Schema condition                             | Output                                                              |
-|----------------------------------------------|---------------------------------------------------------------------|
-| has `example` (and `--ignore-examples` off)  | the example value, verbatim                                         |
-| has `default` (and `--ignore-examples` off)  | the default value, verbatim                                         |
-| has `enum`                                   | random pick from the enum values                                    |
-| `nullable: true`                             | `null` with ~30% probability, otherwise proceeds normally           |
-| `type: object`                               | object with each non-`writeOnly` property recursively generated     |
-| `type: object` with `additionalProperties`   | named properties plus 1–2 random extra keys from the schema         |
-| `type: array` with `items`                   | single-element array from items schema                              |
-| `type: array` without `items`                | empty array                                                         |
-| `type: string` with `format`                 | format-aware random value (UUID, date-time, email, …)               |
-| `type: string`                               | random words, clamped to `minLength` / `maxLength` if present       |
-| `type: integer` / `number`                   | random integer, bounded by `minimum` / `maximum` if present         |
-| `type: boolean`                              | random true/false                                                   |
-| anything else                                | `null`                                                              |
+| Schema condition                            | Output                                                          |
+|---------------------------------------------|-----------------------------------------------------------------|
+| has `example` (and `--ignore-examples` off) | the example value, verbatim                                     |
+| has `default` (and `--ignore-examples` off) | the default value, verbatim                                     |
+| has `enum`                                  | random pick from the enum values                                |
+| `nullable: true`                            | `null` with ~30% probability, otherwise proceeds normally       |
+| `type: object`                              | object with each non-`writeOnly` property recursively generated |
+| `type: object` with `additionalProperties`  | named properties plus 1–2 random extra keys from the schema     |
+| `type: array` with `items`                  | single-element array from items schema                          |
+| `type: array` without `items`               | empty array                                                     |
+| `type: string` with `format`                | format-aware random value (UUID, date-time, email, …)           |
+| `type: string`                              | random words, clamped to `minLength` / `maxLength` if present   |
+| `type: integer` / `number`                  | random integer, bounded by `minimum` / `maximum` if present     |
+| `type: boolean`                             | random true/false                                               |
+| anything else                               | `null`                                                          |
 
-`writeOnly: true` fields are excluded from generated responses. `readOnly: true` fields appear in responses but are ignored in request bodies (see Request handling below).
+`writeOnly: true` fields are excluded from generated responses. `readOnly: true` fields appear in responses but are
+ignored in request bodies (see Request handling below).
 
 ## Request handling
 
