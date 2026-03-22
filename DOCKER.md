@@ -39,7 +39,7 @@ To also push, you may add `--push`. But the CI pipeline should take care of that
 Mount your OpenAPI spec files into `/specs`. Use `HERMIT_SPECS_DIR` to load all files in a directory:
 
 ```sh
-docker run --rm \
+docker run --rm --pull=always \
   -p 8532:8532 \
   -v ./specs_assets:/specs:ro \
   -e HERMIT_SPECS_DIR=specs \
@@ -49,7 +49,7 @@ docker run --rm \
 Or use `HERMIT_SPECS` to load specific files (comma-separated):
 
 ```sh
-docker run --rm \
+docker run --rm --pull=always \
   -p 8532:8532 \
   -v ./specs_assets:/specs:ro \
   -e HERMIT_SPECS=specs/taskflow.openapi.yml,specs/dog_cafe.openapi.json \

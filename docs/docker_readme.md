@@ -10,7 +10,7 @@ Supports `linux/amd64` and `linux/arm64`.
 Mount your specs directory and point `HERMIT_SPECS_DIR` at it:
 
 ```sh
-docker run --rm \
+docker run --rm --pull=always \
   -p 8532:8532 \
   -v ./your-specs:/specs:ro \
   -e HERMIT_SPECS_DIR=specs \
@@ -37,7 +37,7 @@ hermit:
 To load individual files rather than a whole directory, use `HERMIT_SPECS` with a comma-separated list:
 
 ```sh
-docker run --rm \
+docker run --rm --pull=always \
 -p 8532:8532 \
 -v ./your-specs:/specs:ro \
 -e HERMIT_SPECS=specs/users-api.openapi.yml \

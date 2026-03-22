@@ -34,6 +34,7 @@ pub fn load_all(paths: &[std::path::PathBuf]) -> Vec<RouteConfig> {
                     "{} should be a valid OpenAPI spec",
                     path.display()
                 );
+                println!("Loaded spec: {}", path.display());
                 extract_routes(&spec)
             })
         })

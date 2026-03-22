@@ -35,6 +35,7 @@ services:
 
   hermit:
     image: beavuck/hermit:latest
+    pull_policy: always
     environment:
       HERMIT_SPECS_DIR: specs
       HERMIT_IGNORE_EXAMPLES: true

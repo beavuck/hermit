@@ -69,6 +69,7 @@ async fn log_request(
 
 #[cfg_attr(test, mutants::skip)] // not tested
 fn print_banner(port: u16) {
+    let version = env!("CARGO_PKG_VERSION");
     println!(
         r#"
 | |                               | |                                          ,=.
@@ -81,7 +82,7 @@ fn print_banner(port: u16) {
                 .-(  )-.
                (  (  )  )
               (   (  )   )
-              ..//(o o)\\..                       hermit
+              ..//(o o)\\..                       hermit v{version}
 
  Ready on port {port} (if this is running in a container, this port number is internal to the container)
 "#
