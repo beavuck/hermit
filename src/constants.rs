@@ -3,8 +3,9 @@ pub const BIND_ADDR: &str = "0.0.0.0";
 pub const DEFAULT_MIN_ITEMS: usize = 1;
 pub const DEFAULT_MAX_ITEMS: usize = 20;
 pub const DEFAULT_IGNORE_EXAMPLES: bool = false;
-
 pub const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+pub const OBJECT_CIRCULAR_REFS_MAX_DEPTH: usize = 1;
+pub const PERCENT_CHANCE_FOR_NULLABLE_TO_BE_NULL: usize = 30;
 
 pub const RANDOM_WORDS: &[&str] = &[
     "avalanche",

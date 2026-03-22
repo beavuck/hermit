@@ -1,11 +1,14 @@
 #[cfg(not(test))]
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::constants::{BASE64_CHARS, DEFAULT_IGNORE_EXAMPLES, RANDOM_WORDS};
-use crate::resource_store::new_uuid;
+use crate::constants::{
+    DEFAULT_IGNORE_EXAMPLES, OBJECT_CIRCULAR_REFS_MAX_DEPTH, PERCENT_CHANCE_FOR_NULLABLE_TO_BE_NULL,
+};
+use crate::primitive_generator::{primitive_fallback, random_word};
 use crate::spec_parser::{flatten_schema, flatten_schema_forced};
 use rand::RngExt;
 use serde_json::Value as JsonValue;
+use std::collections::{HashMap, VecDeque};
 use yaml_serde::Value as YamlValue;
 
 #[cfg(not(test))]
@@ -21,7 +24,7 @@ pub fn set_ignore_examples(val: bool) {
     #[cfg(not(test))]
     IGNORE_EXAMPLES.store(val, Ordering::Relaxed);
     #[cfg(test)]
-    IGNORE_EXAMPLES_LOCAL.with(|f| f.set(val));
+    IGNORE_EXAMPLES_LOCAL.set(val);
 }
 
 pub fn ignore_examples() -> bool {
@@ -31,7 +34,7 @@ pub fn ignore_examples() -> bool {
     }
     #[cfg(test)]
     {
-        IGNORE_EXAMPLES_LOCAL.with(|f| f.get())
+        IGNORE_EXAMPLES_LOCAL.get()
     }
 }
 
@@ -45,50 +48,139 @@ impl Drop for IgnoreExamplesGuard {
     }
 }
 
-pub fn generate(schema: &YamlValue, root: &YamlValue, forced_variant: Option<&str>) -> JsonValue {
-    let flat = match forced_variant {
-        Some(v) => flatten_schema_forced(schema, root, v),
-        None => flatten_schema(schema, root),
-    };
-    generate_flat(&flat, root, forced_variant)
+enum Frame {
+    Eval {
+        schema: YamlValue,
+        forced: Option<String>,
+    },
+    BuildObject {
+        pending_keys: VecDeque<String>,
+    },
+    BuildArray,
+    ExitRef {
+        ref_path: String,
+    },
 }
 
-fn generate_flat(flat: &YamlValue, root: &YamlValue, forced: Option<&str>) -> JsonValue {
-    if !ignore_examples() {
-        if let Some(example) = flat.get("example") {
-            return yaml_to_json(example);
-        }
-        if let Some(default) = flat.get("default") {
-            return yaml_to_json(default);
+pub fn generate(schema: &YamlValue, root: &YamlValue, forced_variant: Option<&str>) -> JsonValue {
+    let mut frame_stack: Vec<Frame> = vec![Frame::Eval {
+        schema: schema.clone(),
+        forced: forced_variant.map(String::from),
+    }];
+    let mut value_stack: Vec<JsonValue> = Vec::new();
+    let mut visiting_refs: HashMap<String, usize> = HashMap::new();
+
+    while let Some(frame) = frame_stack.pop() {
+        match frame {
+            Frame::Eval { schema, forced } => process_eval(
+                schema,
+                forced,
+                root,
+                &mut frame_stack,
+                &mut value_stack,
+                &mut visiting_refs,
+            ),
+            Frame::BuildObject { pending_keys } => collect_object(pending_keys, &mut value_stack),
+            Frame::BuildArray => collect_array(&mut value_stack),
+            Frame::ExitRef { ref_path } => exit_ref(ref_path, &mut visiting_refs),
         }
     }
 
+    value_stack.pop().unwrap_or(JsonValue::Null)
+}
+
+fn process_eval(
+    schema: YamlValue,
+    forced: Option<String>,
+    root: &YamlValue,
+    frame_stack: &mut Vec<Frame>,
+    value_stack: &mut Vec<JsonValue>,
+    visiting_refs: &mut HashMap<String, usize>,
+) {
+    if let Some(ref_path) = ref_path_of(&schema) {
+        let count = visiting_refs.entry(ref_path.clone()).or_insert(0);
+        if *count > OBJECT_CIRCULAR_REFS_MAX_DEPTH {
+            value_stack.push(JsonValue::Null);
+            return;
+        }
+        *count += 1;
+        frame_stack.push(Frame::ExitRef { ref_path });
+    }
+    let flat = flatten(&schema, root, forced.as_deref());
+    if let Some(value) = override_value(&flat) {
+        value_stack.push(value);
+        return;
+    }
+    schedule(flat, forced, frame_stack, value_stack);
+}
+
+// When `$ref` is absent, `flatten` processes the original schema regardless,
+// so an empty ref path and a missing ref path produce the same output.
+#[cfg_attr(test, mutants::skip)]
+fn ref_path_of(schema: &YamlValue) -> Option<String> {
+    schema.get("$ref")?.as_str().map(String::from)
+}
+
+fn exit_ref(ref_path: String, visiting_refs: &mut HashMap<String, usize>) {
+    if let Some(count) = visiting_refs.get_mut(&ref_path) {
+        *count -= 1;
+    }
+}
+
+fn flatten(schema: &YamlValue, root: &YamlValue, forced: Option<&str>) -> YamlValue {
+    match forced {
+        Some(v) => flatten_schema_forced(schema, root, v),
+        None => flatten_schema(schema, root),
+    }
+}
+
+// The threshold for nullable probability is arbitrary. Any nearby
+// threshold produces indistinguishable test outcomes because the RNG is unseeded.
+#[cfg_attr(test, mutants::skip)]
+fn override_value(flat: &YamlValue) -> Option<JsonValue> {
+    if !ignore_examples() {
+        if let Some(example) = flat.get("example") {
+            return Some(yaml_to_json(example));
+        }
+        if let Some(default) = flat.get("default") {
+            return Some(yaml_to_json(default));
+        }
+    }
     if let Some(enum_seq) = flat.get("enum").and_then(|v| v.as_sequence())
         && !enum_seq.is_empty()
     {
         let idx = rand::rng().random_range(0..enum_seq.len());
-        return yaml_to_json(&enum_seq[idx]);
+        return Some(yaml_to_json(&enum_seq[idx]));
     }
-
     if flat
         .get("nullable")
         .and_then(|v| v.as_bool())
         .unwrap_or(false)
-        && rand::rng().random_range(0..10) < 3
+        && rand::rng().random_range(0..100) < PERCENT_CHANCE_FOR_NULLABLE_TO_BE_NULL
     {
-        return JsonValue::Null;
+        return Some(JsonValue::Null);
     }
+    None
+}
 
+fn schedule(
+    flat: YamlValue,
+    forced: Option<String>,
+    frame_stack: &mut Vec<Frame>,
+    value_stack: &mut Vec<JsonValue>,
+) {
     match flat.get("type").and_then(|v| v.as_str()).unwrap_or("") {
-        "object" => generate_object(flat, root, forced),
-        "array" => generate_array(flat, root, forced),
-        t => primitive_fallback(flat, t),
+        "object" => schedule_object_children(flat, forced, frame_stack),
+        "array" => schedule_array_child(flat, forced, frame_stack, value_stack),
+        t => value_stack.push(primitive_fallback(&flat, t)),
     }
 }
 
-fn generate_object(schema: &YamlValue, root: &YamlValue, forced: Option<&str>) -> JsonValue {
-    let mut map = serde_json::Map::new();
-    if let Some(props) = schema.get("properties").and_then(|v| v.as_mapping()) {
+fn schedule_object_children(flat: YamlValue, forced: Option<String>, frame_stack: &mut Vec<Frame>) {
+    let mut pending_keys: VecDeque<String> = VecDeque::new();
+    let mut eval_frames: Vec<Frame> = Vec::new();
+
+    if let Some(props) = flat.get("properties").and_then(|v| v.as_mapping()) {
         for (k, v) in props {
             if let Some(key) = k.as_str() {
                 let is_write_only = v
@@ -96,135 +188,74 @@ fn generate_object(schema: &YamlValue, root: &YamlValue, forced: Option<&str>) -
                     .and_then(|b| b.as_bool())
                     .unwrap_or(false);
                 if !is_write_only {
-                    map.insert(key.to_string(), generate(v, root, forced));
+                    pending_keys.push_back(key.to_string());
+                    eval_frames.push(Frame::Eval {
+                        schema: v.clone(),
+                        forced: forced.clone(),
+                    });
                 }
             }
         }
     }
-    if let Some(add_props) = schema.get("additionalProperties")
+
+    if let Some(add_props) = flat.get("additionalProperties")
         && add_props.as_bool() != Some(false)
         && add_props.is_mapping()
     {
         let mut rng = rand::rng();
-        for _ in 0..rng.random_range(1..=2) {
+        let count = rng.random_range(1..=2usize);
+        for _ in 0..count {
             let key = random_word(&mut rng).to_string();
-            map.insert(key, generate(add_props, root, forced));
+            pending_keys.push_back(key);
+            eval_frames.push(Frame::Eval {
+                schema: add_props.clone(),
+                forced: forced.clone(),
+            });
         }
     }
-    JsonValue::Object(map)
+
+    // Keys are queued front-to-back; eval frames are stacked in the same order so the frame
+    // stack (LIFO) evaluates them back-to-front, landing values on value_stack in reverse.
+    // collect_object drains keys front-to-back and values top-to-bottom — the two reversals
+    // cancel, pairing each key with its value correctly.
+    frame_stack.push(Frame::BuildObject { pending_keys });
+    frame_stack.extend(eval_frames);
 }
 
-fn generate_array(schema: &YamlValue, root: &YamlValue, forced: Option<&str>) -> JsonValue {
-    match schema.get("items") {
-        Some(items_schema) => JsonValue::Array(vec![generate(items_schema, root, forced)]),
-        None => JsonValue::Array(vec![]),
-    }
-}
-
-fn primitive_fallback(schema: &YamlValue, schema_type: &str) -> JsonValue {
-    let mut rng = rand::rng();
-    match schema_type {
-        "string" => {
-            let fmt = schema.get("format").and_then(|v| v.as_str()).unwrap_or("");
-            let s = if fmt.is_empty() {
-                let min_len = schema
-                    .get("minLength")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as usize;
-                let max_len = schema
-                    .get("maxLength")
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as usize)
-                    .unwrap_or(usize::MAX);
-                let word_count = rng.random_range(2..=5usize);
-                let mut s = (0..word_count)
-                    .map(|_| random_word(&mut rng))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                while s.len() < min_len {
-                    s.push(' ');
-                    s.push_str(random_word(&mut rng));
-                }
-                if s.len() > max_len {
-                    s.truncate(max_len);
-                }
-                s
-            } else {
-                string_for_format(fmt, &mut rng)
-            };
-            JsonValue::String(s)
+fn schedule_array_child(
+    flat: YamlValue,
+    forced: Option<String>,
+    frame_stack: &mut Vec<Frame>,
+    value_stack: &mut Vec<JsonValue>,
+) {
+    match flat.get("items") {
+        Some(items_schema) => {
+            frame_stack.push(Frame::BuildArray);
+            frame_stack.push(Frame::Eval {
+                schema: items_schema.clone(),
+                forced,
+            });
         }
-        "integer" | "number" => {
-            let min_opt = schema.get("minimum").and_then(|v| v.as_i64());
-            let max_opt = schema.get("maximum").and_then(|v| v.as_i64());
-            let (min, max) = match (min_opt, max_opt) {
-                (Some(min), Some(max)) => (min, max),
-                (Some(min), None) => (min, min + 999),
-                (None, Some(max)) => (max - 999, max),
-                (None, None) => (1, 1000),
-            };
-            JsonValue::Number(rng.random_range(min..=max).into())
-        }
-        "boolean" => JsonValue::Bool(rng.random()),
-        _ => JsonValue::Null,
+        None => value_stack.push(JsonValue::Array(vec![])),
     }
 }
 
-fn random_word(rng: &mut impl RngExt) -> &'static str {
-    RANDOM_WORDS[rng.random_range(0..RANDOM_WORDS.len())]
+fn collect_object(mut pending_keys: VecDeque<String>, value_stack: &mut Vec<JsonValue>) {
+    let mut map = serde_json::Map::new();
+    while let Some(key) = pending_keys.pop_front() {
+        let val = value_stack
+            .pop()
+            .expect("value stack should have a value for each pending object property");
+        map.insert(key, val);
+    }
+    value_stack.push(JsonValue::Object(map));
 }
 
-fn string_for_format(fmt: &str, rng: &mut impl RngExt) -> String {
-    match fmt {
-        "date-time" => format!(
-            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-            rng.random_range(2000u16..=2030),
-            rng.random_range(1u8..=12),
-            rng.random_range(1u8..=28),
-            rng.random_range(0u8..=23),
-            rng.random_range(0u8..=59),
-            rng.random_range(0u8..=59),
-        ),
-        "date" => format!(
-            "{:04}-{:02}-{:02}",
-            rng.random_range(2000u16..=2030),
-            rng.random_range(1u8..=12),
-            rng.random_range(1u8..=28),
-        ),
-        "time" => format!(
-            "{:02}:{:02}:{:02}Z",
-            rng.random_range(0u8..=23),
-            rng.random_range(0u8..=59),
-            rng.random_range(0u8..=59),
-        ),
-        "uuid" => new_uuid(),
-        "email" => format!("{}@{}.com", random_word(rng), random_word(rng)),
-        "uri" => format!("https://{}.com/{}", random_word(rng), random_word(rng)),
-        "hostname" => format!("{}.{}", random_word(rng), random_word(rng)),
-        "ipv4" => format!(
-            "{}.{}.{}.{}",
-            rng.random_range(1u8..=254),
-            rng.random::<u8>(),
-            rng.random::<u8>(),
-            rng.random_range(1u8..=254),
-        ),
-        "ipv6" => format!(
-            "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-            rng.random::<u16>(),
-        ),
-        "byte" => (0..8)
-            .map(|_| BASE64_CHARS[rng.random_range(0..64)] as char)
-            .collect(),
-        "password" => format!("{}-{}", random_word(rng), random_word(rng)),
-        _ => String::new(),
-    }
+fn collect_array(value_stack: &mut Vec<JsonValue>) {
+    let item = value_stack
+        .pop()
+        .expect("value stack should have a value for array item");
+    value_stack.push(JsonValue::Array(vec![item]));
 }
 
 fn yaml_to_json(v: &YamlValue) -> JsonValue {
@@ -851,6 +882,107 @@ mod tests {
         assert_eq!(result["name"], json!("Alice"));
     }
 
+    // --- deep nesting (stack overflow regression) ---
+
+    #[test]
+    fn generate_does_not_overflow_when_property_has_deeply_nested_example() {
+        use yaml_serde::Value as YV;
+
+        let _guard = IgnoreExamplesGuard;
+        set_ignore_examples(true);
+
+        let mut example = YV::Null;
+        for _ in 0..500 {
+            let mut m = yaml_serde::Mapping::new();
+            m.insert(YV::String("child".into()), example);
+            example = YV::Mapping(m);
+        }
+
+        let mut prop_schema = yaml_serde::Mapping::new();
+        prop_schema.insert(YV::String("type".into()), YV::String("string".into()));
+        prop_schema.insert(YV::String("example".into()), example);
+
+        let mut properties = yaml_serde::Mapping::new();
+        properties.insert(YV::String("data".into()), YV::Mapping(prop_schema));
+
+        let mut schema_map = yaml_serde::Mapping::new();
+        schema_map.insert(YV::String("type".into()), YV::String("object".into()));
+        schema_map.insert(YV::String("properties".into()), YV::Mapping(properties));
+
+        let schema = YV::Mapping(schema_map);
+        let root = YV::Mapping(yaml_serde::Mapping::new());
+
+        let result = generate(&schema, &root, None);
+        assert!(
+            result.is_object(),
+            "object with deeply nested example should generate without overflow"
+        );
+    }
+
+    #[test]
+    fn generate_does_not_overflow_on_deep_ref_chain() {
+        let depth = 200;
+        let mut root_yaml = String::from("S0:\n  type: string\n");
+        for i in 1..=depth {
+            root_yaml.push_str(&format!(
+                "S{i}:\n  type: object\n  properties:\n    child:\n      $ref: '#/S{}'\n",
+                i - 1
+            ));
+        }
+        let root = yaml(&root_yaml);
+        let schema = yaml(&format!("$ref: '#/S{depth}'"));
+
+        let result = generate(&schema, &root, None);
+        assert!(
+            result.is_object(),
+            "200-level $ref chain should generate without overflow"
+        );
+    }
+
+    // --- circular $ref ---
+
+    #[test]
+    fn generate_does_not_loop_on_circular_ref() {
+        let root = yaml(
+            "company:\n\
+             \x20 type: object\n\
+             \x20 properties:\n\
+             \x20   name:\n\
+             \x20     type: string\n\
+             \x20   mother:\n\
+             \x20     $ref: '#/company'",
+        );
+        let schema = yaml("$ref: '#/company'");
+        let result = generate(&schema, &root, None);
+        assert!(
+            result.is_object(),
+            "circular $ref should terminate and produce an object"
+        );
+    }
+
+    #[test]
+    fn generate_allows_one_extra_level_for_circular_ref() {
+        let root = yaml(
+            "company:\n\
+             \x20 type: object\n\
+             \x20 properties:\n\
+             \x20   name:\n\
+             \x20     type: string\n\
+             \x20   mother:\n\
+             \x20     $ref: '#/company'",
+        );
+        let schema = yaml("$ref: '#/company'");
+        let result = generate(&schema, &root, None);
+        assert!(
+            result["mother"].is_object(),
+            "mother should be a real company object"
+        );
+        assert!(
+            !result["mother"]["mother"].is_object(),
+            "mother.mother should be cut off (not a nested company object)"
+        );
+    }
+
     // --- forced variant ---
 
     #[test]
@@ -871,5 +1003,26 @@ mod tests {
         );
         assert_eq!(generate(&schema, &root, Some("b"))["k"], json!("b"));
         assert_eq!(generate(&schema, &root, Some("a"))["k"], json!("a"));
+    }
+
+    // --- exit_ref: ref count is decremented so the same ref can be visited across siblings ---
+
+    #[test]
+    fn generate_object_with_same_ref_in_three_properties_all_resolve() {
+        let root = yaml("Tag:\n  type: string\n  example: label");
+        let schema = yaml(
+            "type: object\n\
+             properties:\n\
+             \x20 a:\n\
+             \x20   $ref: '#/Tag'\n\
+             \x20 b:\n\
+             \x20   $ref: '#/Tag'\n\
+             \x20 c:\n\
+             \x20   $ref: '#/Tag'",
+        );
+        let result = generate(&schema, &root, None);
+        assert_eq!(result["a"], json!("label"));
+        assert_eq!(result["b"], json!("label"));
+        assert_eq!(result["c"], json!("label"));
     }
 }

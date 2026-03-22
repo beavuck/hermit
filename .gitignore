@@ -80,3 +80,4 @@ node_modules/
 /api_tests/hermit_api_tests/test_report.html
 /api_tests/hermit_api_tests/test_report.json
 /coverage/lcov.info
+/huge_specs/

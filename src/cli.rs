@@ -210,6 +210,12 @@ mod tests {
     }
 
     #[test]
+    fn validate_accepts_specs_dir_that_exists() {
+        let args = Args::try_parse_from(["hermit", "--specs-dir", "specs_assets"]).unwrap();
+        assert!(args.validate().is_ok());
+    }
+
+    #[test]
     fn validate_rejects_specs_dir_that_does_not_exist() {
         let args =
             Args::try_parse_from(["hermit", "--specs-dir", "/nonexistent/path/to/specs"]).unwrap();

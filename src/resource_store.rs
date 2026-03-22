@@ -80,7 +80,7 @@ pub fn json_value_to_string(v: &Value) -> String {
         .unwrap_or_else(|| v.to_string())
 }
 
-fn new_id_like(existing: &Value) -> Option<Value> {
+pub(crate) fn new_id_like(existing: &Value) -> Option<Value> {
     match existing {
         Value::Number(_) => Some(Value::Number(rand::rng().random::<u32>().into())),
         Value::String(_) => Some(Value::String(new_uuid())),
@@ -171,6 +171,9 @@ pub fn fill_to_count(template_items: Vec<Value>, min: usize, max: usize) -> Vec<
         .collect()
 }
 
+// The `Some(Array(_))` arm and the wildcard arm produce identical output: both
+// return `Value::Array(item_values)`. No test can distinguish between them.
+#[cfg_attr(test, mutants::skip)]
 pub fn build_collection_response(mock_body: &Option<Value>, items: Vec<&Value>) -> Value {
     let item_values: Vec<Value> = items.into_iter().cloned().collect();
     match mock_body {
@@ -233,6 +236,17 @@ mod tests {
         store.put_item("/items/abc", json!({"id": "abc"}));
         let items = store.collection_items("/items").unwrap();
         assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn delete_item_retains_other_items_in_collection() {
+        let mut store = CrudStore::new();
+        store.put_item("/items/abc", json!({"id": "abc"}));
+        store.put_item("/items/def", json!({"id": "def"}));
+        store.delete_item("/items/abc");
+        let remaining: Vec<_> = store.collection_items("/items").unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0]["id"], json!("def"));
     }
 
     #[test]

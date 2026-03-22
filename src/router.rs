@@ -14,7 +14,7 @@ use crate::http_method::HttpMethod;
 use crate::resource_generator::ignore_examples;
 use crate::resource_store::{
     CrudStore, build_collection_response, extract_items_from_mock, fill_to_count,
-    fill_to_count_with_generator, is_item_pattern, json_value_to_string, new_uuid,
+    fill_to_count_with_generator, is_item_pattern, json_value_to_string, new_id_like, new_uuid,
 };
 use crate::spec_parser::RouteConfig;
 
@@ -26,6 +26,19 @@ pub struct AppState {
     item_generators: HashMap<String, Arc<dyn Fn() -> serde_json::Value + Send + Sync>>,
     min_items: usize,
     max_items: usize,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            routes: HashMap::new(),
+            store: Arc::new(RwLock::new(CrudStore::new())),
+            collection_templates: HashMap::new(),
+            item_generators: HashMap::new(),
+            min_items: DEFAULT_MIN_ITEMS,
+            max_items: DEFAULT_MAX_ITEMS,
+        }
+    }
 }
 
 pub fn build(configs: Vec<RouteConfig>) -> Router {
@@ -221,21 +234,30 @@ fn post_item(
             .or_else(|| variants.values().next())
             .cloned()
     } else if location_only {
-        Some(serde_json::Value::Object(serde_json::Map::new()))
+        state
+            .collection_templates
+            .get(collection)
+            .and_then(|items| items.first())
+            .cloned()
+            .or_else(|| Some(serde_json::Value::Object(serde_json::Map::new())))
     } else {
         cfg.body.clone()
     };
 
     let mut new_item = merge_excluding(base, request_fields, &cfg.read_only_fields);
+
+    if location_only && let Some(obj) = new_item.as_object_mut() {
+        let fresh_id = obj
+            .get("id")
+            .and_then(new_id_like)
+            .unwrap_or_else(|| serde_json::Value::String(new_uuid()));
+        obj.insert("id".to_string(), fresh_id);
+    }
+
     let id = new_item
         .get("id")
         .map(json_value_to_string)
         .unwrap_or_else(new_uuid);
-
-    if location_only && let Some(obj) = new_item.as_object_mut() {
-        obj.entry("id")
-            .or_insert(serde_json::Value::String(id.clone()));
-    }
 
     let item_path = format!("{}/{}", collection, id);
 
@@ -309,6 +331,10 @@ mod tests {
     use serde_json::json;
 
     use super::{merge, merge_excluding};
+
+    fn empty_state() -> std::sync::Arc<super::AppState> {
+        std::sync::Arc::new(super::AppState::default())
+    }
 
     // --- merge: read-only field protection ---
 
@@ -679,20 +705,9 @@ mod tests {
 
     #[tokio::test]
     async fn readonly_handler_returns_404_when_route_not_in_state() {
-        use super::{AppState, handle_readonly};
-        use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS};
-        use crate::resource_store::CrudStore;
+        use super::handle_readonly;
         use axum::Router;
-        use std::collections::HashMap;
-        use std::sync::{Arc, RwLock};
-        let state = Arc::new(AppState {
-            routes: HashMap::new(),
-            store: Arc::new(RwLock::new(CrudStore::new())),
-            collection_templates: HashMap::new(),
-            item_generators: HashMap::new(),
-            min_items: DEFAULT_MIN_ITEMS,
-            max_items: DEFAULT_MAX_ITEMS,
-        });
+        let state = empty_state();
         let app = Router::new()
             .route("/items", axum::routing::get(handle_readonly))
             .with_state(state);
@@ -709,20 +724,9 @@ mod tests {
 
     #[tokio::test]
     async fn body_handler_returns_404_when_route_not_in_state() {
-        use super::{AppState, handle_with_body};
-        use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS};
-        use crate::resource_store::CrudStore;
+        use super::handle_with_body;
         use axum::Router;
-        use std::collections::HashMap;
-        use std::sync::{Arc, RwLock};
-        let state = Arc::new(AppState {
-            routes: HashMap::new(),
-            store: Arc::new(RwLock::new(CrudStore::new())),
-            collection_templates: HashMap::new(),
-            item_generators: HashMap::new(),
-            min_items: DEFAULT_MIN_ITEMS,
-            max_items: DEFAULT_MAX_ITEMS,
-        });
+        let state = empty_state();
         let app = Router::new()
             .route("/items", axum::routing::post(handle_with_body))
             .with_state(state);
@@ -1156,7 +1160,7 @@ mod tests {
         crate::resource_generator::set_ignore_examples(true);
         let _guard = IgnoreExamplesGuard;
 
-        let generator: Arc<dyn Fn() -> serde_json::Value + Send + Sync> =
+        let generator: Arc<dyn Fn() -> Value + Send + Sync> =
             Arc::new(|| json!({"name": "generated"}));
         let app = build_with_bounds(
             vec![RouteConfig {
@@ -1183,6 +1187,118 @@ mod tests {
         let items = body.as_array().unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0]["name"], json!("generated"));
+    }
+
+    // --- collection_templates filtering ---
+
+    #[tokio::test]
+    async fn collection_templates_are_not_populated_from_non_get_routes() {
+        let app = build_with_bounds(
+            vec![
+                route(HttpMethod::Get, "/items", 200, None),
+                route(
+                    HttpMethod::Post,
+                    "/items",
+                    201,
+                    Some(json!([{"id": "from-post"}])),
+                ),
+            ],
+            1,
+            1,
+        );
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        let count = response_json(response).await.as_array().unwrap().len();
+        assert_eq!(
+            count, 0,
+            "collection should not be seeded from non-GET route templates"
+        );
+    }
+
+    #[tokio::test]
+    async fn collection_templates_are_not_populated_from_get_item_routes() {
+        let app = build_with_bounds(
+            vec![
+                route(HttpMethod::Get, "/items", 200, None),
+                route(
+                    HttpMethod::Get,
+                    "/items/{id}",
+                    200,
+                    Some(json!({"id": "x", "name": "item"})),
+                ),
+            ],
+            1,
+            1,
+        );
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        let count = response_json(response).await.as_array().unwrap().len();
+        assert_eq!(
+            count, 0,
+            "item-pattern GET route should not seed collection templates"
+        );
+    }
+
+    // --- DELETE removes item from store ---
+
+    #[tokio::test]
+    async fn delete_removes_posted_item_from_collection() {
+        let app = build(vec![
+            route(HttpMethod::Get, "/items", 200, Some(json!([]))),
+            route(HttpMethod::Post, "/items", 201, None),
+            route(HttpMethod::Delete, "/items/{id}", 204, None),
+        ]);
+
+        let post_resp = send(
+            app.clone(),
+            Request::builder()
+                .method(Method::POST)
+                .uri("/items")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"thing"}"#))
+                .unwrap(),
+        )
+        .await;
+        let location = post_resp
+            .headers()
+            .get("location")
+            .expect("POST should return a Location header")
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        send(
+            app.clone(),
+            Request::builder()
+                .method(Method::DELETE)
+                .uri(&location)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+
+        let response = send(
+            app,
+            Request::builder()
+                .uri("/items")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await;
+        let items = response_json(response).await.as_array().unwrap().len();
+        assert_eq!(items, 0, "deleted item should not appear in collection");
     }
 
     #[tokio::test]

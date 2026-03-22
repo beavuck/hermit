@@ -1,10 +1,10 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use hermit::{resource_generator, spec_parser};
+use hermit::{resource_generator, spec_loader};
 
 const SPEC_PATH: &str = "specs_assets/taskflow.openapi.yml";
 
 fn bench_generate_plain_object(c: &mut Criterion) {
-    let root = spec_parser::load(std::path::Path::new(SPEC_PATH));
+    let root = spec_loader::load(std::path::Path::new(SPEC_PATH));
     let schema = root["components"]["schemas"]["ProjectBase"].clone();
     c.bench_function("generate_plain_object", |b| {
         b.iter(|| {
@@ -18,7 +18,7 @@ fn bench_generate_plain_object(c: &mut Criterion) {
 }
 
 fn bench_generate_deep_all_of(c: &mut Criterion) {
-    let root = spec_parser::load(std::path::Path::new(SPEC_PATH));
+    let root = spec_loader::load(std::path::Path::new(SPEC_PATH));
     let schema = root["components"]["schemas"]["Project"].clone();
     c.bench_function("generate_deep_all_of", |b| {
         b.iter(|| {
@@ -32,7 +32,7 @@ fn bench_generate_deep_all_of(c: &mut Criterion) {
 }
 
 fn bench_generate_discriminator_forced(c: &mut Criterion) {
-    let root = spec_parser::load(std::path::Path::new(SPEC_PATH));
+    let root = spec_loader::load(std::path::Path::new(SPEC_PATH));
     let schema = root["components"]["schemas"]["TaskCreate"].clone();
     c.bench_function("generate_discriminator_forced", |b| {
         b.iter(|| {
@@ -46,7 +46,7 @@ fn bench_generate_discriminator_forced(c: &mut Criterion) {
 }
 
 fn bench_generate_paginated_array(c: &mut Criterion) {
-    let root = spec_parser::load(std::path::Path::new(SPEC_PATH));
+    let root = spec_loader::load(std::path::Path::new(SPEC_PATH));
     let schema = root["components"]["schemas"]["ProjectPage"].clone();
     c.bench_function("generate_paginated_array", |b| {
         b.iter(|| {

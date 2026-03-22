@@ -1,14 +1,14 @@
 use axum::body::Body;
 use axum::http::Request;
 use criterion::{Criterion, criterion_group, criterion_main};
-use hermit::{router, spec_parser};
+use hermit::{router, spec_loader, spec_parser};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 const SPEC_PATH: &str = "specs_assets/taskflow.openapi.yml";
 
 fn build_router() -> axum::Router {
-    let spec = spec_parser::load(std::path::Path::new(SPEC_PATH));
+    let spec = spec_loader::load(std::path::Path::new(SPEC_PATH));
     let routes = spec_parser::extract_routes(&spec);
     router::build(routes)
 }

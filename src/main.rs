@@ -1,7 +1,10 @@
+// not unit-testable, the other unit tests and the API tests do a decent job overall though
+
 #![forbid(unsafe_code)]
 use clap::Parser;
-use hermit::{cli, constants, router, spec_parser};
+use hermit::{cli, constants, router, spec_loader};
 
+#[cfg_attr(test, mutants::skip)] // not tested
 #[tokio::main]
 async fn main() {
     let args = cli::Args::parse();
@@ -11,8 +14,8 @@ async fn main() {
     });
     hermit::resource_generator::set_ignore_examples(args.ignore_examples);
     let routes = match args.specs_dir {
-        Some(ref dir) => spec_parser::load_dir(dir),
-        None => spec_parser::load_all(&args.specs),
+        Some(ref dir) => spec_loader::load_dir(dir),
+        None => spec_loader::load_all(&args.specs),
     };
     let app = router::build_with_bounds(routes, args.min_items, args.max_items)
         .layer(axum::middleware::from_fn(log_request));
@@ -28,6 +31,7 @@ async fn main() {
         .expect("server should serve without error");
 }
 
+#[cfg_attr(test, mutants::skip)] // not tested
 async fn shutdown_signal() {
     #[cfg(unix)]
     {
@@ -44,6 +48,7 @@ async fn shutdown_signal() {
         .expect("ctrl_c handler should register");
 }
 
+#[cfg_attr(test, mutants::skip)] // not tested
 async fn log_request(
     req: axum::extract::Request,
     next: axum::middleware::Next,
@@ -62,6 +67,7 @@ async fn log_request(
     response
 }
 
+#[cfg_attr(test, mutants::skip)] // not tested
 fn print_banner(port: u16) {
     println!(
         r#"

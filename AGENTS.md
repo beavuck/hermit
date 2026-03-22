@@ -107,6 +107,11 @@ Let the user test each small unit before moving to the next. This allows:
 - Ensure you use no deprecated methods, APIs, or libraries.
 - Favor immutability.
 - Favor composition over inheritance.
+- Prefer iterative style to recursive style; only use recursion when you can mathematically prove it is safe (bounded
+  depth, no stack overflow risk) and faster.
 - Follow Rust conventions and best practices for code structure, project layout, error handling, and performance.
 - When a fix requires increasing complexity, stop and look for an approach that removes the dependency instead of
   working around it.
+- Use contract functions. A contract function only invokes other functions, to execute some important, high level
+  capability. This means the code must be broken out into enough functions that the contract function can be easily read
+  by someone wanting to understand the main steps in executing this functionality.

@@ -18,7 +18,7 @@ runtime:
       value: "{{CREATED_ORDER_ID}}"
     - expression: res.body.type
       operator: eq
-      value: "dine_in"
+      value: dine_in
     - expression: res.body.tableNumber
       operator: isDefined
     - expression: res.body.dogId

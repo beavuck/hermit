@@ -1,53 +1,9 @@
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use yaml_serde::Value;
 
-use rayon::prelude::*;
-
 use crate::http_method::HttpMethod;
-
-pub fn load(path: &Path) -> Value {
-    let text = std::fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("{} should be readable: {e}", path.display()));
-    yaml_serde::from_str(&text)
-        .unwrap_or_else(|e| panic!("{} should contain valid YAML or JSON: {e}", path.display()))
-}
-
-pub fn load_dir(path: &Path) -> Vec<RouteConfig> {
-    let files: Vec<std::path::PathBuf> = std::fs::read_dir(path)
-        .expect("specs directory should be readable")
-        .map(|e| e.expect("directory entry should be readable").path())
-        .filter(|p| p.is_file())
-        .collect();
-
-    assert!(!files.is_empty(), "specs directory should contain files");
-
-    load_all(&files)
-}
-
-pub fn load_all(paths: &[std::path::PathBuf]) -> Vec<RouteConfig> {
-    let handles: Vec<_> = paths
-        .iter()
-        .map(|path| {
-            let path = path.clone();
-            std::thread::spawn(move || {
-                let spec = load(&path);
-                assert!(
-                    spec.get("paths").is_some(),
-                    "{} should be a valid OpenAPI spec",
-                    path.display()
-                );
-                extract_routes(&spec)
-            })
-        })
-        .collect();
-
-    handles
-        .into_iter()
-        .flat_map(|h| h.join().expect("spec loader thread should not panic"))
-        .collect()
-}
+use rayon::prelude::*;
 
 pub fn resolve_ref<'a>(root: &'a Value, ref_str: &str) -> Option<&'a Value> {
     let path = ref_str.trim_start_matches('#').trim_start_matches('/');
@@ -59,117 +15,178 @@ pub fn resolve_ref<'a>(root: &'a Value, ref_str: &str) -> Option<&'a Value> {
 }
 
 pub fn flatten_schema(schema: &Value, root: &Value) -> Value {
-    flatten_inner(schema, root, None)
+    let mut visiting = HashSet::new();
+    flatten_inner(schema, root, None, &mut visiting)
 }
 
 pub fn flatten_schema_forced(schema: &Value, root: &Value, variant: &str) -> Value {
-    flatten_inner(schema, root, Some(variant))
+    let mut visiting = HashSet::new();
+    flatten_inner(schema, root, Some(variant), &mut visiting)
 }
 
-fn flatten_inner(schema: &Value, root: &Value, forced: Option<&str>) -> Value {
-    if schema.get("$ref").is_some() {
-        return flatten_ref(schema, root, forced);
-    }
-    if schema.get("allOf").is_some() {
-        return flatten_all_of(schema, root, forced);
-    }
-    try_flatten_composite(schema, root, forced).unwrap_or_else(|| schema.clone())
+enum RefStep {
+    Followed(Value),
+    Stop,
+    NotARef,
 }
 
-thread_local! {
-    static VISITING_REFS: std::cell::RefCell<HashSet<String>> =
-        std::cell::RefCell::new(HashSet::new());
-}
-
-fn flatten_ref(schema: &Value, root: &Value, forced: Option<&str>) -> Value {
-    let Some(ref_str) = schema.get("$ref").and_then(|v| v.as_str()) else {
-        return schema.clone();
+fn step_ref(current: &Value, root: &Value, visiting: &mut HashSet<String>) -> RefStep {
+    let Some(ref_str) = current
+        .get("$ref")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+    else {
+        return RefStep::NotARef;
     };
-    let already_visiting = VISITING_REFS.with(|v| v.borrow().contains(ref_str));
-    if already_visiting {
-        return schema.clone();
+    if visiting.contains(&ref_str) {
+        return RefStep::Stop;
     }
-    VISITING_REFS.with(|v| v.borrow_mut().insert(ref_str.to_string()));
-    let result = resolve_ref(root, ref_str)
-        .map(|resolved| flatten_inner(resolved, root, forced))
-        .unwrap_or_else(|| schema.clone());
-    VISITING_REFS.with(|v| v.borrow_mut().remove(ref_str));
-    result
+    visiting.insert(ref_str.clone());
+    match resolve_ref(root, &ref_str) {
+        Some(resolved) => RefStep::Followed(resolved.clone()),
+        None => RefStep::Stop,
+    }
 }
 
-fn flatten_all_of(schema: &Value, root: &Value, forced: Option<&str>) -> Value {
-    let merged = schema
-        .get("allOf")
-        .and_then(|v| v.as_sequence())
-        .map(|items| merge_all_of_properties(items, root, forced))
-        .unwrap_or_default();
-    let mut result = yaml_serde::Mapping::new();
-    result.insert(Value::String("type".into()), Value::String("object".into()));
-    result.insert(Value::String("properties".into()), Value::Mapping(merged));
-    Value::Mapping(result)
-}
-
-fn merge_all_of_properties(
-    items: &[Value],
+fn flatten_inner(
+    schema: &Value,
     root: &Value,
     forced: Option<&str>,
+    visiting: &mut HashSet<String>,
+) -> Value {
+    let mut current = schema.clone();
+
+    loop {
+        match step_ref(&current, root, visiting) {
+            RefStep::Followed(v) => {
+                current = v;
+                continue;
+            }
+            RefStep::Stop => break,
+            RefStep::NotARef => {}
+        }
+
+        if current.get("allOf").is_some() {
+            let merged = flatten_all_of(&current, root, forced, visiting);
+            let mut result = yaml_serde::Mapping::new();
+            result.insert(Value::String("type".into()), Value::String("object".into()));
+            result.insert(Value::String("properties".into()), Value::Mapping(merged));
+            return Value::Mapping(result);
+        }
+
+        if let Some(variant) = pick_composite_variant(&current, root, forced) {
+            current = variant;
+            continue;
+        }
+
+        break;
+    }
+
+    current
+}
+
+fn flatten_all_of(
+    schema: &Value,
+    root: &Value,
+    forced: Option<&str>,
+    visiting: &mut HashSet<String>,
 ) -> yaml_serde::Mapping {
     let mut merged = yaml_serde::Mapping::new();
-    for item in items {
-        let flat = flatten_inner(item, root, forced);
-        if let Some(props) = flat.get("properties").and_then(|v| v.as_mapping()) {
-            for (k, v) in props {
-                merged.insert(k.clone(), v.clone());
+    let Some(items) = schema.get("allOf").and_then(|v| v.as_sequence()) else {
+        return merged;
+    };
+    let mut queue: VecDeque<Value> = items.iter().cloned().collect();
+
+    while let Some(item) = queue.pop_front() {
+        let mut current = item;
+
+        loop {
+            match step_ref(&current, root, visiting) {
+                RefStep::Followed(v) => {
+                    current = v;
+                    continue;
+                }
+                RefStep::Stop => break,
+                RefStep::NotARef => {}
             }
+
+            if let Some(inner_items) = current.get("allOf").and_then(|v| v.as_sequence()) {
+                queue.extend(inner_items.iter().cloned());
+                break;
+            }
+
+            if let Some(variant) = pick_composite_variant(&current, root, forced) {
+                current = variant;
+                continue;
+            }
+
+            if let Some(props) = current.get("properties").and_then(|v| v.as_mapping()) {
+                for (k, v) in props {
+                    merged.insert(k.clone(), v.clone());
+                }
+            }
+            break;
         }
     }
     merged
 }
 
-fn try_flatten_composite(schema: &Value, root: &Value, forced: Option<&str>) -> Option<Value> {
+fn pick_composite_variant(schema: &Value, root: &Value, forced: Option<&str>) -> Option<Value> {
     let variants = ["oneOf", "anyOf"].iter().find_map(|key| {
         let seq = schema.get(*key)?.as_sequence()?;
         if seq.is_empty() { None } else { Some(seq) }
     })?;
 
     if let Some(forced_key) = forced
-        && let Some(result) = try_forced_variant(schema, root, forced_key, forced)
+        && let Some(variant) = try_pick_forced(schema, root, forced_key)
     {
-        return Some(result);
+        return Some(variant);
     }
-    Some(flatten_inner(&variants[0], root, forced))
+
+    Some(variants[0].clone())
 }
 
-fn try_forced_variant(
-    schema: &Value,
-    root: &Value,
-    forced_key: &str,
-    forced: Option<&str>,
-) -> Option<Value> {
+fn try_pick_forced(schema: &Value, root: &Value, forced_key: &str) -> Option<Value> {
     let mapping = schema.get("discriminator")?.get("mapping")?.as_mapping()?;
     let lookup = Value::String(forced_key.to_string());
     let ref_str = mapping.get(&lookup)?.as_str()?;
-    let resolved = resolve_ref(root, ref_str)?;
-    Some(flatten_inner(resolved, root, forced))
+    resolve_ref(root, ref_str).cloned()
 }
 
 pub fn find_discriminator(schema: &Value, root: &Value) -> Option<(String, Vec<String>)> {
-    if let Some(ref_str) = schema.get("$ref").and_then(|v| v.as_str()) {
-        return resolve_ref(root, ref_str).and_then(|resolved| find_discriminator(resolved, root));
-    }
+    let mut visiting = HashSet::new();
+    let mut queue: VecDeque<Value> = VecDeque::from([schema.clone()]);
 
-    for composite_key in &["oneOf", "anyOf"] {
-        if schema.get(*composite_key).is_some()
-            && let Some(info) = discriminator_info(schema)
-        {
-            return Some(info);
+    while let Some(item) = queue.pop_front() {
+        let mut current = item;
+
+        loop {
+            match step_ref(&current, root, &mut visiting) {
+                RefStep::Followed(v) => {
+                    current = v;
+                    continue;
+                }
+                RefStep::Stop => break,
+                RefStep::NotARef => {}
+            }
+
+            for composite_key in &["oneOf", "anyOf"] {
+                if current.get(*composite_key).is_some()
+                    && let Some(info) = discriminator_info(&current)
+                {
+                    return Some(info);
+                }
+            }
+
+            if let Some(items) = current.get("allOf").and_then(|v| v.as_sequence()) {
+                queue.extend(items.iter().cloned());
+            }
+
+            break;
         }
     }
 
-    schema
-        .get("allOf")
-        .and_then(|v| v.as_sequence())
-        .and_then(|items| items.iter().find_map(|item| find_discriminator(item, root)))
+    None
 }
 
 fn discriminator_info(schema: &Value) -> Option<(String, Vec<String>)> {
@@ -196,7 +213,7 @@ pub struct RouteConfig {
     pub discriminator_field: Option<String>,
     pub variants: Option<HashMap<String, serde_json::Value>>,
     pub item_generator: Option<Arc<dyn Fn() -> serde_json::Value + Send + Sync>>,
-    pub read_only_fields: std::collections::HashSet<String>,
+    pub read_only_fields: HashSet<String>,
 }
 
 impl Default for RouteConfig {
@@ -230,7 +247,7 @@ pub fn extract_routes(spec: &Value) -> Vec<RouteConfig> {
         for &method in HttpMethod::ALL {
             if let Some(mut route) = path_item
                 .get(method.as_str())
-                .and_then(|op| route_for_operation(path_str, method, op, spec, &spec_arc))
+                .and_then(|op| route_for_operation(method, op, spec, &spec_arc))
             {
                 route.axum_path = axum_path.clone();
                 routes.push(route);
@@ -240,6 +257,9 @@ pub fn extract_routes(spec: &Value) -> Vec<RouteConfig> {
     routes
 }
 
+// `trim_end_matches('/')` never produces `"/"`, so any `trimmed == "/"` check
+// is unreachable dead code that no test can exercise.
+#[cfg_attr(test, mutants::skip)]
 fn server_base_path(spec: &Value) -> String {
     let url = spec
         .get("servers")
@@ -264,7 +284,6 @@ fn server_base_path(spec: &Value) -> String {
 }
 
 fn route_for_operation(
-    path: &str,
     method: HttpMethod,
     operation: &Value,
     spec: &Value,
@@ -273,16 +292,11 @@ fn route_for_operation(
     let responses = operation.get("responses")?;
     let (status_code, response) = first_success_response(responses);
 
-    let schema = if status_code != NO_BODY_STATUS {
-        extract_response_schema(response, spec)
-    } else {
-        None
-    };
+    let schema = extract_response_schema(response, spec);
 
     Some(match schema {
-        Some(s) => route_from_schema(path, method, status_code, s, spec, spec_arc),
+        Some(s) => route_from_schema(method, status_code, s, spec, spec_arc),
         None => RouteConfig {
-            axum_path: path.to_string(),
             method,
             status_code,
             ..Default::default()
@@ -291,7 +305,6 @@ fn route_for_operation(
 }
 
 fn route_from_schema(
-    path: &str,
     method: HttpMethod,
     status_code: u16,
     schema: &Value,
@@ -312,7 +325,6 @@ fn route_from_schema(
             })
             .collect();
         return RouteConfig {
-            axum_path: path.to_string(),
             method,
             status_code,
             discriminator_field: Some(disc_field),
@@ -323,7 +335,6 @@ fn route_from_schema(
     }
     let item_generator = build_item_generator(schema, spec, spec_arc);
     RouteConfig {
-        axum_path: path.to_string(),
         method,
         status_code,
         body: Some(crate::resource_generator::generate(schema, spec, None)),
@@ -333,9 +344,9 @@ fn route_from_schema(
     }
 }
 
-fn collect_read_only_fields(schema: &Value, root: &Value) -> std::collections::HashSet<String> {
+fn collect_read_only_fields(schema: &Value, root: &Value) -> HashSet<String> {
     let flat = flatten_schema(schema, root);
-    let mut fields = std::collections::HashSet::new();
+    let mut fields = HashSet::new();
     if let Some(props) = flat.get("properties").and_then(|v| v.as_mapping()) {
         for (k, v) in props {
             if let Some(key) = k.as_str()
@@ -377,12 +388,18 @@ fn extract_item_schema(response_schema: &Value, root: &Value) -> Option<Value> {
         .cloned()
 }
 
-const NO_BODY_STATUS: u16 = 204;
-const SUCCESS_STATUS_CODES: &[u16] = &[200, 201, 204];
-
 fn first_success_response(responses: &Value) -> (u16, &Value) {
-    for &code in SUCCESS_STATUS_CODES {
-        if let Some(resp) = responses.get(code.to_string().as_str()) {
+    if let Some(mapping) = responses.as_mapping() {
+        let mut candidates: Vec<(u16, &Value)> = mapping
+            .iter()
+            .filter_map(|(k, v)| {
+                let code: u16 = k.as_str()?.parse().ok()?;
+                let success_range = 200..300;
+                success_range.contains(&code).then_some((code, v))
+            })
+            .collect();
+        candidates.sort_by_key(|&(code, _)| code);
+        if let Some((code, resp)) = candidates.into_iter().next() {
             return (code, resp);
         }
     }
@@ -403,9 +420,9 @@ fn extract_response_schema<'a>(response: &'a Value, root: &'a Value) -> Option<&
 
 #[cfg(test)]
 mod tests {
-    use crate::http_method::HttpMethod;
-
     use super::*;
+    use crate::http_method::HttpMethod;
+    use crate::spec_loader::load_all;
 
     fn yaml(s: &str) -> Value {
         yaml_serde::from_str(s).unwrap()
@@ -774,12 +791,6 @@ mod tests {
     }
 
     #[test]
-    fn load_reads_yaml_from_file() {
-        let val = load(Path::new("specs_assets/taskflow.openapi.yml"));
-        assert!(val.get("paths").is_some());
-    }
-
-    #[test]
     fn load_all_returns_routes_from_all_specs_in_parallel() {
         let path = std::path::PathBuf::from("specs_assets/taskflow.openapi.yml");
         let routes = load_all(&[path.clone(), path]);
@@ -1012,36 +1023,15 @@ mod tests {
         assert!(value.is_object());
     }
 
-    #[test]
-    fn load_dir_returns_routes_from_all_files_in_directory() {
-        let routes = load_dir(Path::new("specs_assets"));
-        assert!(
-            routes.len() >= 2,
-            "expected routes from multiple spec files"
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn load_dir_panics_when_directory_is_empty() {
-        let dir = std::env::temp_dir().join("hermit_test_empty_dir_for_load_dir");
-        std::fs::create_dir_all(&dir).unwrap();
-        for entry in std::fs::read_dir(&dir).unwrap() {
-            std::fs::remove_file(entry.unwrap().path()).ok();
-        }
-        load_dir(&dir);
-    }
-
-    #[test]
-    #[should_panic]
-    fn load_dir_panics_when_a_file_is_not_a_valid_openapi_spec() {
-        let dir = std::env::temp_dir().join("hermit_test_invalid_spec_dir_for_load_dir");
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("not_openapi.yaml"), "foo: bar").unwrap();
-        load_dir(&dir);
-    }
-
     // --- circular $ref cycle detection ---
+
+    #[test]
+    fn flatten_all_of_returns_empty_when_all_of_is_not_a_sequence() {
+        let root = yaml("{}");
+        let schema = yaml("allOf: null");
+        let flat = flatten_schema(&schema, &root);
+        assert!(flat.is_mapping(), "flat schema should be a mapping value");
+    }
 
     #[test]
     fn flatten_schema_does_not_overflow_on_direct_circular_ref() {
@@ -1057,5 +1047,173 @@ mod tests {
         let schema = yaml("$ref: '#/A'");
         let flat = flatten_schema(&schema, &root);
         assert!(flat.is_mapping(), "flat schema should be a mapping value");
+    }
+
+    #[test]
+    fn flatten_schema_all_of_with_circular_ref_in_item_does_not_overflow() {
+        let root = yaml("Node:\n  $ref: '#/Node'");
+        let schema = yaml("allOf:\n  - $ref: '#/Node'");
+        let flat = flatten_schema(&schema, &root);
+        assert!(flat.is_mapping(), "flat schema should be a mapping value");
+    }
+
+    #[test]
+    fn find_discriminator_does_not_overflow_on_circular_ref() {
+        let root = yaml("A:\n  $ref: '#/B'\nB:\n  $ref: '#/A'");
+        let schema = yaml("$ref: '#/A'");
+        let result = find_discriminator(&schema, &root);
+        assert!(
+            result.is_none(),
+            "circular ref should produce no discriminator"
+        );
+    }
+
+    // --- method field on extracted routes ---
+
+    #[test]
+    fn extract_routes_method_is_correct_for_route_without_response_schema() {
+        let spec = yaml(
+            "paths:\n\
+             \x20 /items:\n\
+             \x20   post:\n\
+             \x20     responses:\n\
+             \x20       '201':\n\
+             \x20         description: Created",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].method, HttpMethod::Post);
+    }
+
+    #[test]
+    fn extract_routes_method_is_correct_for_route_with_response_schema() {
+        let spec = yaml(
+            "paths:\n\
+             \x20 /items/{id}:\n\
+             \x20   put:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         content:\n\
+             \x20           application/json:\n\
+             \x20             schema:\n\
+             \x20               type: object\n\
+             \x20               properties:\n\
+             \x20                 id:\n\
+             \x20                   type: string\n\
+             \x20                   example: abc\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].method, HttpMethod::Put);
+    }
+
+    // --- discriminator branch: status_code and read_only_fields ---
+
+    #[test]
+    fn extract_routes_discriminator_route_has_correct_status_code_and_read_only_fields() {
+        let spec = yaml(
+            "Cat:\n\
+             \x20 type: object\n\
+             \x20 properties:\n\
+             \x20   id:\n\
+             \x20     type: string\n\
+             \x20     readOnly: true\n\
+             \x20   kind:\n\
+             \x20     type: string\n\
+             \x20     example: cat\n\
+             Dog:\n\
+             \x20 type: object\n\
+             \x20 properties:\n\
+             \x20   kind:\n\
+             \x20     type: string\n\
+             \x20     example: dog\n\
+             paths:\n\
+             \x20 /items:\n\
+             \x20   post:\n\
+             \x20     responses:\n\
+             \x20       '201':\n\
+             \x20         content:\n\
+             \x20           application/json:\n\
+             \x20             schema:\n\
+             \x20               oneOf:\n\
+             \x20                 - $ref: '#/Cat'\n\
+             \x20                 - $ref: '#/Dog'\n\
+             \x20               discriminator:\n\
+             \x20                 propertyName: kind\n\
+             \x20                 mapping:\n\
+             \x20                   cat: '#/Cat'\n\
+             \x20                   dog: '#/Dog'\n\
+             \x20         description: Created",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes[0].method, HttpMethod::Post);
+        assert_eq!(routes[0].status_code, 201);
+        assert!(routes[0].read_only_fields.contains("id"));
+    }
+
+    // --- item_generator for envelope responses ---
+
+    #[test]
+    fn extract_routes_item_generator_is_set_for_envelope_response_with_array_property() {
+        let spec = yaml(
+            "paths:\n\
+             \x20 /items:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '200':\n\
+             \x20         content:\n\
+             \x20           application/json:\n\
+             \x20             schema:\n\
+             \x20               type: object\n\
+             \x20               properties:\n\
+             \x20                 total:\n\
+             \x20                   type: integer\n\
+             \x20                   example: 5\n\
+             \x20                 items:\n\
+             \x20                   type: array\n\
+             \x20                   items:\n\
+             \x20                     type: object\n\
+             \x20                     properties:\n\
+             \x20                       name:\n\
+             \x20                         type: string\n\
+             \x20                         example: test\n\
+             \x20         description: OK",
+        );
+        let routes = extract_routes(&spec);
+        let generator = routes[0]
+            .item_generator
+            .as_ref()
+            .expect("route should have an item_generator for envelope response");
+        let value = generator();
+        assert!(value.is_object(), "item generator should produce an object");
+        assert_eq!(value["name"], serde_json::json!("test"));
+    }
+
+    // --- success response selection ---
+
+    #[test]
+    fn extract_routes_picks_any_2xx_response_code() {
+        let spec = yaml(
+            "paths:\n\
+             \x20 /items:\n\
+             \x20   get:\n\
+             \x20     responses:\n\
+             \x20       '206':\n\
+             \x20         content:\n\
+             \x20           application/json:\n\
+             \x20             schema:\n\
+             \x20               type: object\n\
+             \x20               properties:\n\
+             \x20                 name:\n\
+             \x20                   type: string\n\
+             \x20                   example: hello\n\
+             \x20         description: Partial Content",
+        );
+        let routes = extract_routes(&spec);
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].status_code, 206);
+        assert!(
+            routes[0].body.is_some(),
+            "206 response should generate a body"
+        );
     }
 }

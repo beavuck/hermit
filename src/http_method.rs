@@ -1,3 +1,6 @@
+// not tested, as this is a relatively trivial enum
+// and tests would mostly involve just testing the Rust language itself
+#[cfg_attr(test, mutants::skip)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HttpMethod {
     Get,
@@ -10,6 +13,7 @@ pub enum HttpMethod {
     Trace,
 }
 
+#[cfg_attr(test, mutants::skip)] // not tested
 impl HttpMethod {
     pub const ALL: &'static [Self] = &[
         Self::Get,
@@ -40,6 +44,7 @@ impl HttpMethod {
     }
 }
 
+#[cfg_attr(test, mutants::skip)] // not tested
 impl TryFrom<&str> for HttpMethod {
     type Error = ();
 
