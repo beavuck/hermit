@@ -38,7 +38,6 @@ services:
     pull_policy: always
     environment:
       HERMIT_SPECS_DIR: specs
-      HERMIT_IGNORE_EXAMPLES: true
     ports:
       - "8532:8532"
     volumes:

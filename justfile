@@ -3,10 +3,10 @@ setup:
     cargo install --locked cargo-nextest
 
 run:
-    cargo run -- --ignore-examples --specs-dir specs_assets
+    cargo run -- --specs-dir specs_assets
 
 run-huge:
-    cargo run -- --ignore-examples --specs-dir huge_specs
+    cargo run -- --specs-dir huge_specs
 
 bench:
     cargo nextest bench --bench startup_bench --bench generate_bench --bench request_bench

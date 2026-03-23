@@ -2,7 +2,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::constants::{
-    DEFAULT_IGNORE_EXAMPLES, OBJECT_CIRCULAR_REFS_MAX_DEPTH, PERCENT_CHANCE_FOR_NULLABLE_TO_BE_NULL,
+    DEFAULT_USE_EXAMPLES, OBJECT_CIRCULAR_REFS_MAX_DEPTH, PERCENT_CHANCE_FOR_NULLABLE_TO_BE_NULL,
 };
 use crate::primitive_generator::{primitive_fallback, random_word};
 use crate::spec_parser::{flatten_schema, flatten_schema_forced};
@@ -12,39 +12,39 @@ use std::collections::{HashMap, VecDeque};
 use yaml_serde::Value as YamlValue;
 
 #[cfg(not(test))]
-static IGNORE_EXAMPLES: AtomicBool = AtomicBool::new(DEFAULT_IGNORE_EXAMPLES);
+static USE_EXAMPLES: AtomicBool = AtomicBool::new(DEFAULT_USE_EXAMPLES);
 
 #[cfg(test)]
 thread_local! {
-    static IGNORE_EXAMPLES_LOCAL: std::cell::Cell<bool> =
-        const { std::cell::Cell::new(DEFAULT_IGNORE_EXAMPLES) };
+    static USE_EXAMPLES_LOCAL: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(DEFAULT_USE_EXAMPLES) };
 }
 
-pub fn set_ignore_examples(val: bool) {
+pub fn set_use_examples(val: bool) {
     #[cfg(not(test))]
-    IGNORE_EXAMPLES.store(val, Ordering::Relaxed);
+    USE_EXAMPLES.store(val, Ordering::Relaxed);
     #[cfg(test)]
-    IGNORE_EXAMPLES_LOCAL.set(val);
+    USE_EXAMPLES_LOCAL.set(val);
 }
 
-pub fn ignore_examples() -> bool {
+pub fn use_examples() -> bool {
     #[cfg(not(test))]
     {
-        IGNORE_EXAMPLES.load(Ordering::Relaxed)
+        USE_EXAMPLES.load(Ordering::Relaxed)
     }
     #[cfg(test)]
     {
-        IGNORE_EXAMPLES_LOCAL.get()
+        USE_EXAMPLES_LOCAL.get()
     }
 }
 
 #[cfg(test)]
-struct IgnoreExamplesGuard;
+pub(crate) struct UseExamplesGuard;
 
 #[cfg(test)]
-impl Drop for IgnoreExamplesGuard {
+impl Drop for UseExamplesGuard {
     fn drop(&mut self) {
-        set_ignore_examples(false);
+        set_use_examples(DEFAULT_USE_EXAMPLES);
     }
 }
 
@@ -138,7 +138,7 @@ fn flatten(schema: &YamlValue, root: &YamlValue, forced: Option<&str>) -> YamlVa
 // threshold produces indistinguishable test outcomes because the RNG is unseeded.
 #[cfg_attr(test, mutants::skip)]
 fn override_value(flat: &YamlValue) -> Option<JsonValue> {
-    if !ignore_examples() {
+    if use_examples() {
         if let Some(example) = flat.get("example") {
             return Some(yaml_to_json(example));
         }
@@ -266,18 +266,18 @@ fn yaml_to_json(v: &YamlValue) -> JsonValue {
 mod tests {
     use serde_json::json;
 
-    use super::{IgnoreExamplesGuard, generate, set_ignore_examples};
+    use super::{UseExamplesGuard, generate, set_use_examples};
 
     fn yaml(s: &str) -> yaml_serde::Value {
         yaml_serde::from_str(s).unwrap()
     }
 
-    // --- ignore_examples global ---
+    // --- use_examples global ---
 
     #[test]
-    fn generate_ignores_example_when_global_set() {
-        let _guard = IgnoreExamplesGuard;
-        set_ignore_examples(true);
+    fn generate_does_not_use_example_when_global_set() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(false);
         let root = yaml("{}");
         let result = generate(&yaml("type: string\nexample: hello"), &root, None);
         assert!(result.is_string());
@@ -288,6 +288,8 @@ mod tests {
 
     #[test]
     fn generate_returns_top_level_example() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml("type: string\nexample: hello");
         assert_eq!(generate(&schema, &root, None), json!("hello"));
@@ -297,6 +299,8 @@ mod tests {
 
     #[test]
     fn generate_object_includes_all_properties() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml(
             "type: object\n\
@@ -324,6 +328,8 @@ mod tests {
 
     #[test]
     fn generate_array_returns_single_item_from_items_schema() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml("type: array\nitems:\n  type: string\n  example: item");
         let result = generate(&schema, &root, None);
@@ -334,6 +340,8 @@ mod tests {
 
     #[test]
     fn generate_array_with_example_returns_example() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml("type: array\nexample: [a, b]\nitems:\n  type: string");
         assert_eq!(generate(&schema, &root, None), json!(["a", "b"]));
@@ -534,6 +542,8 @@ mod tests {
 
     #[test]
     fn generate_follows_ref() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("Name:\n  type: string\n  example: Alice");
         let schema = yaml("$ref: '#/Name'");
         assert_eq!(generate(&schema, &root, None), json!("Alice"));
@@ -541,6 +551,8 @@ mod tests {
 
     #[test]
     fn generate_merges_all_of() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml(
             "allOf:\n\
@@ -564,6 +576,8 @@ mod tests {
 
     #[test]
     fn generate_object_excludes_write_only_properties() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml(
             "type: object\n\
@@ -586,6 +600,8 @@ mod tests {
 
     #[test]
     fn generate_object_includes_read_only_properties() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml(
             "type: object\n\
@@ -601,6 +617,8 @@ mod tests {
 
     #[test]
     fn generate_object_with_mixed_fields_excludes_only_write_only() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml(
             "type: object\n\
@@ -630,6 +648,8 @@ mod tests {
 
     #[test]
     fn generate_uses_default_when_no_example_present() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml("type: string\ndefault: pending");
         assert_eq!(generate(&schema, &root, None), json!("pending"));
@@ -637,6 +657,8 @@ mod tests {
 
     #[test]
     fn generate_prefers_example_over_default() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml("type: string\ndefault: pending\nexample: active");
         assert_eq!(generate(&schema, &root, None), json!("active"));
@@ -652,15 +674,17 @@ mod tests {
 
     #[test]
     fn generate_default_works_for_integer_type() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml("type: integer\ndefault: 20");
         assert_eq!(generate(&schema, &root, None), json!(20));
     }
 
     #[test]
-    fn generate_ignores_default_when_ignore_examples_is_set() {
-        let _guard = IgnoreExamplesGuard;
-        set_ignore_examples(true);
+    fn generate_does_not_use_default_when_use_examples_is_false() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(false);
         let root = yaml("{}");
         let result = generate(&yaml("type: string\ndefault: pending"), &root, None);
         assert_ne!(result, json!("pending"));
@@ -842,6 +866,8 @@ mod tests {
 
     #[test]
     fn generate_object_named_properties_and_additional_properties_includes_both() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml(
             "type: object\n\
@@ -867,6 +893,8 @@ mod tests {
 
     #[test]
     fn generate_object_additional_properties_false_returns_only_named_properties() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("{}");
         let schema = yaml(
             "type: object\n\
@@ -888,8 +916,8 @@ mod tests {
     fn generate_does_not_overflow_when_property_has_deeply_nested_example() {
         use yaml_serde::Value as YV;
 
-        let _guard = IgnoreExamplesGuard;
-        set_ignore_examples(true);
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
 
         let mut example = YV::Null;
         for _ in 0..500 {
@@ -987,6 +1015,8 @@ mod tests {
 
     #[test]
     fn generate_forced_variant_picks_correct_schema() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml(
             "A:\n  type: object\n  properties:\n    k:\n      example: a\n\
              B:\n  type: object\n  properties:\n    k:\n      example: b",
@@ -1009,6 +1039,8 @@ mod tests {
 
     #[test]
     fn generate_object_with_same_ref_in_three_properties_all_resolve() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let root = yaml("Tag:\n  type: string\n  example: label");
         let schema = yaml(
             "type: object\n\

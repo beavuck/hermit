@@ -47,26 +47,24 @@ beavuck/hermit
 
 ## Environment variables
 
-| Variable                        | Default      | Description                                                        |
-|---------------------------------|--------------|--------------------------------------------------------------------|
-| `HERMIT_SPECS_DIR`              | *(required)* | Path to a directory of OpenAPI spec files                          |
-| `HERMIT_SPECS`                  | *(required)* | Comma-separated paths to individual spec files                     |
-| `HERMIT_PORT`                   | `8532`       | Port to listen on                                                  |
-| `HERMIT_MIN_ITEMS`              | `1`          | Minimum items in generated arrays                                  |
-| `HERMIT_MAX_ITEMS`              | `20`         | Maximum items in generated arrays                                  |
-| `HERMIT_IGNORE_EXAMPLES`        | `false`      | Ignore `example` fields in schemas                                 |
-| `HERMIT_CORS_ALLOWED_ORIGINS`   | `*`          | Allowed CORS origins; `*` for all, or comma-separated list         |
-
-`HERMIT_SPECS_DIR` and `HERMIT_SPECS` are mutually exclusive -- exactly one must be provided.
+| Variable                      | Default      | Description                                                                         |
+|-------------------------------|--------------|-------------------------------------------------------------------------------------|
+| `HERMIT_SPECS_DIR`            | *(required)* | Path to a directory of OpenAPI spec files (conflicts with `HERMIT_SPECS`)           |
+| `HERMIT_SPECS`                | *(required)* | Comma-separated paths to individual spec files  (conflicts with `HERMIT_SPECS_DIR`) |
+| `HERMIT_PORT`                 | `8532`       | Internal port to listen on                                                          |
+| `HERMIT_MIN_ITEMS`            | `1`          | Minimum items in generated arrays                                                   |
+| `HERMIT_MAX_ITEMS`            | `20`         | Maximum items in generated arrays                                                   |
+| `HERMIT_USE_EXAMPLES`         | `false`      | Use `example` fields from schemas instead of generating random data                 |
+| `HERMIT_CORS_ALLOWED_ORIGINS` | `*`          | Allowed CORS origins; `*` for all, or comma-separated list                          |
 
 ## How responses are generated
 
-| Priority | Source              | When                                                                     |
-|----------|---------------------|--------------------------------------------------------------------------|
-| 1        | Request body fields | `POST`, `PUT`, `PATCH` -- your values are reflected back in the response |
-| 2        | `example` in schema | Field has an explicit example value                                      |
-| 3        | `default` in schema | Field has a default value                                                |
-| 4        | Random value        | Fallback -- format-aware (UUID, date-time, …)                            |
+| Priority | Source              | When                                                                      |
+|----------|---------------------|---------------------------------------------------------------------------|
+| 1        | Request body fields | `POST`, `PUT`, `PATCH` -- your values are reflected back in the response  |
+| 2        | `example` in schema | Field has an explicit example value (and `HERMIT_USE_EXAMPLES` is `true`) |
+| 3        | `default` in schema | Field has a default value (and `HERMIT_USE_EXAMPLES` is `true`)           |
+| 4        | Random value        | Fallback -- format-aware (UUID, date-time, …)                             |
 
 Fields marked `readOnly` are never overridden by request body values. Fields marked `writeOnly` are excluded from
 responses.

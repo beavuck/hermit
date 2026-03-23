@@ -12,7 +12,7 @@ use axum::{
 use crate::cli::CorsOrigins;
 use crate::constants::{DEFAULT_MAX_ITEMS, DEFAULT_MIN_ITEMS};
 use crate::http_method::HttpMethod;
-use crate::resource_generator::ignore_examples;
+use crate::resource_generator::use_examples;
 use crate::resource_store::{
     CrudStore, build_collection_response, extract_items_from_mock, fill_to_count,
     fill_to_count_with_generator, is_item_pattern, json_value_to_string, new_id_like, new_uuid,
@@ -200,7 +200,7 @@ fn get_collection(state: &AppState, cfg: &RouteConfig, concrete: &str) -> Respon
             .get(&cfg.axum_path)
             .cloned()
             .unwrap_or_default();
-        let filled = if ignore_examples() {
+        let filled = if !use_examples() {
             if let Some(generator) = state.item_generators.get(&cfg.axum_path) {
                 let generator = Arc::clone(generator);
                 fill_to_count_with_generator(state.min_items, state.max_items, move || generator())
@@ -1163,20 +1163,20 @@ mod tests {
         assert_eq!(response_json(response).await.as_array().unwrap().len(), 5);
     }
 
-    // --- ignore_examples collection generation ---
+    // --- use_examples collection generation ---
 
-    struct IgnoreExamplesGuard;
-    impl Drop for IgnoreExamplesGuard {
+    struct UseExamplesGuard;
+    impl Drop for UseExamplesGuard {
         fn drop(&mut self) {
-            crate::resource_generator::set_ignore_examples(false);
+            crate::resource_generator::set_use_examples(DEFAULT_USE_EXAMPLES);
         }
     }
 
     #[tokio::test]
-    async fn get_collection_with_ignore_examples_uses_item_generator_when_present() {
+    async fn get_collection_with_use_examples_false_uses_item_generator_when_present() {
         use std::sync::Arc;
-        crate::resource_generator::set_ignore_examples(true);
-        let _guard = IgnoreExamplesGuard;
+        crate::resource_generator::set_use_examples(false);
+        let _guard = UseExamplesGuard;
 
         let generator: Arc<dyn Fn() -> Value + Send + Sync> =
             Arc::new(|| json!({"name": "generated"}));
@@ -1320,9 +1320,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_collection_with_ignore_examples_falls_back_to_templates_without_generator() {
-        crate::resource_generator::set_ignore_examples(true);
-        let _guard = IgnoreExamplesGuard;
+    async fn get_collection_with_use_examples_false_falls_back_to_templates_without_generator() {
+        crate::resource_generator::set_use_examples(false);
+        let _guard = UseExamplesGuard;
 
         let app = build_with_bounds(
             vec![route(
@@ -1350,6 +1350,7 @@ mod tests {
 
     use super::with_cors;
     use crate::cli::CorsOrigins;
+    use crate::constants::DEFAULT_USE_EXAMPLES;
 
     #[tokio::test]
     async fn cors_wildcard_allows_any_origin() {

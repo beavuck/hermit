@@ -315,9 +315,11 @@ fn route_from_schema(
     if method.uses_request_body()
         && let Some((disc_field, keys)) = find_discriminator(schema, spec)
     {
+        let use_examples = crate::resource_generator::use_examples();
         let variants = keys
             .par_iter()
             .map(|key| {
+                crate::resource_generator::set_use_examples(use_examples);
                 (
                     key.clone(),
                     crate::resource_generator::generate(schema, spec, Some(key)),
@@ -422,6 +424,7 @@ fn extract_response_schema<'a>(response: &'a Value, root: &'a Value) -> Option<&
 mod tests {
     use super::*;
     use crate::http_method::HttpMethod;
+    use crate::resource_generator::{UseExamplesGuard, set_use_examples};
     use crate::spec_loader::load_all;
 
     fn yaml(s: &str) -> Value {
@@ -709,6 +712,8 @@ mod tests {
 
     #[test]
     fn extract_routes_get_generates_body_from_schema() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let spec = yaml(
             "paths:\n\
              \x20 /items:\n\
@@ -752,6 +757,8 @@ mod tests {
 
     #[test]
     fn extract_routes_post_with_discriminator_generates_variants() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let spec = yaml(
             "components:\n\
              \x20 schemas:\n\
@@ -844,6 +851,8 @@ mod tests {
 
     #[test]
     fn extract_routes_resolves_ref_response() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let spec = yaml(
             "components:\n\
              \x20 responses:\n\
@@ -1154,6 +1163,8 @@ mod tests {
 
     #[test]
     fn extract_routes_item_generator_is_set_for_envelope_response_with_array_property() {
+        let _guard = UseExamplesGuard;
+        set_use_examples(true);
         let spec = yaml(
             "paths:\n\
              \x20 /items:\n\

@@ -48,9 +48,9 @@ pub struct Args {
     #[arg(long, default_value_t = DEFAULT_MAX_ITEMS, env = "HERMIT_MAX_ITEMS")]
     pub max_items: usize,
 
-    /// Skip `example` values from the spec and generate random data instead.
-    #[arg(long, default_value_t = false, env = "HERMIT_IGNORE_EXAMPLES")]
-    pub ignore_examples: bool,
+    /// Use `example` values from the spec instead of generating random data.
+    #[arg(long, default_value_t = false, env = "HERMIT_USE_EXAMPLES")]
+    pub use_examples: bool,
 
     /// Allowed CORS origins. Use `*` to allow all origins, or a comma-separated list of specific origins.
     #[arg(long, default_value = "*", env = "HERMIT_CORS_ALLOWED_ORIGINS")]
@@ -183,16 +183,15 @@ mod tests {
     }
 
     #[test]
-    fn ignore_examples_defaults_to_false() {
+    fn use_examples_defaults_to_false() {
         let args = Args::try_parse_from(["hermit", "--specs", "a.yaml"]).unwrap();
-        assert!(!args.ignore_examples);
+        assert!(!args.use_examples);
     }
 
     #[test]
-    fn ignore_examples_flag_can_be_set() {
-        let args =
-            Args::try_parse_from(["hermit", "--specs", "a.yaml", "--ignore-examples"]).unwrap();
-        assert!(args.ignore_examples);
+    fn use_examples_flag_can_be_set() {
+        let args = Args::try_parse_from(["hermit", "--specs", "a.yaml", "--use-examples"]).unwrap();
+        assert!(args.use_examples);
     }
 
     #[test]

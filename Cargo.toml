@@ -1,9 +1,8 @@
 [package]
 name = "beavuck-hermit"
-version = "1.4.2"
+version = "1.4.3"
 edition = "2024"
-license-file = "UNLICENSE"
-homepage = "https://gitlab.com/beavuck-services/hermit"
+license = "Unlicense"
 repository = "https://gitlab.com/beavuck-services/hermit"
 readme = "README.md"
 description = "OpenAPI mock server -- serve realistic responses from any OpenAPI spec"

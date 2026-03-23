@@ -60,20 +60,7 @@ docker run --rm --pull=always \
 
 ## Environment variables
 
-All CLI flags are also available as environment variables. CLI args take precedence over env vars.
-
-| Variable                        | CLI equivalent           | Default      |
-|---------------------------------|--------------------------|--------------|
-| `HERMIT_SPECS_DIR`              | `--specs-dir`            | *(required)* |
-| `HERMIT_SPECS`                  | `--specs`                | *(required)* |
-| `HERMIT_PORT`                   | `--port`                 | `8532`       |
-| `HERMIT_MIN_ITEMS`              | `--min-items`            | `1`          |
-| `HERMIT_MAX_ITEMS`              | `--max-items`            | `20`         |
-| `HERMIT_IGNORE_EXAMPLES`        | `--ignore-examples`      | `false`      |
-| `HERMIT_CORS_ALLOWED_ORIGINS`   | `--cors-allowed-origins` | `*`          |
-
-`HERMIT_SPECS_DIR` and `HERMIT_SPECS` are mutually exclusive -- exactly one must be provided.
-`HERMIT_SPECS` accepts a comma-separated list of paths.
+See [options.md](docs/options.md).
 
 ## docker-compose
 
@@ -85,7 +72,6 @@ Here is a docker-compose example of a typical Hermit setup:
     pull_policy: always
     environment:
       HERMIT_SPECS_DIR: specs
-      HERMIT_IGNORE_EXAMPLES: true
     ports:
       - "8532:8532"
     volumes:
