@@ -1,0 +1,37 @@
+services:
+  api-editor-db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: "apicurio-registry"
+      POSTGRES_USER: "apicurio-registry"
+      POSTGRES_PASSWORD: "apicurio-registry"
+    ports:
+      - "5432:5432"
+    volumes:
+      - api-editor-db-data:/var/lib/postgresql
+  api-editor:
+    image: apicurio/apicurio-registry:latest
+    environment:
+      apicurio.rest.deletion.group.enabled: "true"
+      apicurio.rest.deletion.artifact.enabled: "true"
+      apicurio.rest.deletion.artifact-version.enabled: "true"
+      apicurio.rest.mutability.artifact-version-content.enabled: "true"
+      QUARKUS_HTTP_CORS_ORIGINS: "*"
+      apicurio.storage.kind: "sql"
+      apicurio.storage.sql.kind: "postgresql"
+      apicurio.datasource.url: "jdbc:postgresql://api-editor-db:5432/apicurio-registry"
+      apicurio.datasource.username: "apicurio-registry"
+      apicurio.datasource.password: "apicurio-registry"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api-editor-db
+  api-editor-ui:
+    image: apicurio/apicurio-registry-ui:latest
+    ports:
+      - "8888:8080"
+    depends_on:
+      - api-editor
+
+volumes:
+  api-editor-db-data:

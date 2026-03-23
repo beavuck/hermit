@@ -238,6 +238,16 @@ run_api_tests:
           - ARCH: amd64
             RUST_TARGET: x86_64-unknown-linux-musl
 
+publish_to_cargo:
+  extends: .cargo_cache
+  stage: deploy
+  image: rust:alpine
+  script:
+    - CARGO_REGISTRY_TOKEN=$CARGO_TOKEN cargo publish
+  rules:
+    - if: "$CI_COMMIT_TAG"
+      when: manual
+
 release_hermit:
   stage: deploy
   image: registry.gitlab.com/gitlab-org/release-cli:latest
@@ -245,6 +255,7 @@ release_hermit:
     - if: "$CI_COMMIT_TAG"
   needs:
     - job: publish_to_docker
+    - job: publish_to_cargo
     - job: build_hermit
       artifacts: true
   before_script:
@@ -281,3 +292,6 @@ release_hermit:
         - name: "docker-image"
           url: "https://hub.docker.com/repository/docker/beavuck/${CI_PROJECT_NAME}/tags?name=${CI_COMMIT_TAG}"
           link_type: image
+        - name: "crates.io"
+          url: "https://crates.io/crates/beavuck-${CI_PROJECT_NAME}/${CI_COMMIT_TAG}"
+          link_type: package

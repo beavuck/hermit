@@ -19,11 +19,13 @@ PAYLOAD=$(jq -n \
   --arg tag_name "$TAG" \
   --arg description "$RELEASE_DESCRIPTION" \
   --arg docker_hub "https://hub.docker.com/repository/docker/beavuck/${PROJECT_NAME}/tags?name=${TAG}" \
+  --arg crates_io "https://crates.io/crates/beavuck-${PROJECT_NAME}/${TAG}" \
   --arg linux_amd64 "${PROJECT_API_URL}/packages/generic/${PROJECT_NAME}/${TAG}/${PROJECT_NAME}-linux-amd64" \
   --arg linux_arm64 "${PROJECT_API_URL}/packages/generic/${PROJECT_NAME}/${TAG}/${PROJECT_NAME}-linux-arm64" \
   --arg windows_amd64 "${PROJECT_API_URL}/packages/generic/${PROJECT_NAME}/${TAG}/${PROJECT_NAME}-windows-amd64.exe" \
   '{name: $name, tag_name: $tag_name, description: $description, assets: {links: [
-    {name: "docker-image",   url: $tag_name,       link_type: "image"},
+    {name: "crates.io",   url: $crates_io,      link_type: "package"},
+    {name: "docker-image",   url: $docker_hub,     link_type: "image"},
     {name: "linux-amd64",    url: $linux_amd64,    link_type: "package"},
     {name: "linux-arm64",    url: $linux_arm64,    link_type: "package"},
     {name: "windows-amd64",  url: $windows_amd64,  link_type: "package"}

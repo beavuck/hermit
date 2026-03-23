@@ -1,9 +1,7 @@
 # 🦀🐚 Beavuck Hermit
 
-Hermit is a zero-config OpenAPI mock server. Point it at a spec file, and it starts serving lightning-fast
-schema-accurate responses out of the box -- no stubs to write, no configuration.
-
-At the moment, it is made for running on Linux AMD64 platforms (x86_64) only.
+Hermit is an OpenAPI mock server. Point it at a spec file, and it starts serving lightning-fast
+schema-accurate responses out of the box -- no stubs to write, sensible defaults, configurable.
 
 ## 📊 Status
 
@@ -102,8 +100,8 @@ Response field values are resolved in priority order:
 | Priority | Source              | When                                                                                 |
 |----------|---------------------|--------------------------------------------------------------------------------------|
 | 1        | Request body fields | `POST`, `PUT`, `PATCH` -- caller's values win, except for `readOnly` fields          |
-| 2        | `example` in schema | Field has an explicit example value                                                  |
-| 3        | `default` in schema | Field has a default value and no example                                             |
+| 2        | `example` in schema | Field has an explicit example value (if `--use-examples`)                            |
+| 3        | `default` in schema | Field has a default value and no example (if `--use-examples`)                       |
 | 4        | Random value        | Fallback -- random word, number, boolean, or format-aware value (UUID, date-time, …) |
 
 Fields marked `readOnly: true` in the schema are never overridden by request body values. Fields marked
@@ -143,6 +141,10 @@ Stop the server with `Ctrl+C`, or if it's running in the background:
 ```bash
 kill $(lsof -ti :8532)
 ```
+
+## ⚙️ Options and environment variables
+
+See [options.md](docs/options.md).
 
 ## 🔒 Privacy
 

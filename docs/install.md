@@ -22,4 +22,4 @@ Re-run the same command to update to the latest release.
 Download `hermit-windows-amd64.exe` from
 the [latest release](https://gitlab.com/beavuck-services/hermit/-/releases/permalink/latest).
 
-Alternatively, use Docker -- see [DOCKER.md](../DOCKER.md).
+Alternatively, use Docker -- see [docker_readme.md](docker_readme.md).
