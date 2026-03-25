@@ -1,10 +1,16 @@
-### Quick install (Linux)
+### Cargo
 
-```bash
-curl -fsSL https://gitlab.com/beavuck-services/hermit/-/raw/main/scripts/install.sh | sh
-```
+Manage your install from Cargo, Rust's package manager.
+See [cargo.md](cargo.md).
 
-### Manual install (Linux)
+### Docker / docker-compose
+
+Skip installation and run Hermit in a container.
+See [docker.md](docker.md).
+
+### Raw binary
+
+**Linux:**
 
 ```bash
 ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') \
@@ -17,9 +23,13 @@ ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') \
 
 Re-run the same command to update to the latest release.
 
-### Windows
+To uninstall, simply delete the binary:
+
+```bash
+sudo rm /usr/local/bin/hermit
+```
+
+**Windows:**
 
 Download `hermit-windows-amd64.exe` from
 the [latest release](https://gitlab.com/beavuck-services/hermit/-/releases/permalink/latest).
-
-Alternatively, use Docker -- see [docker_readme.md](docker_readme.md).

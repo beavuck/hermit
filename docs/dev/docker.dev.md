@@ -60,7 +60,7 @@ docker run --rm --pull=always \
 
 ## Environment variables
 
-See [options.md](docs/options.md).
+See [options.md](../options.md).
 
 ## docker-compose
 

@@ -115,6 +115,10 @@ See [install.md](docs/install.md).
 
 See [cargo.md](docs/cargo.md).
 
+## 🐳 Pull from Docker Hub
+
+See [docker.md](docs/docker.md).
+
 ## 🚀 Quick start
 
 Run Hermit against your spec (replace the path with your actual spec file):
@@ -141,6 +145,8 @@ Stop the server with `Ctrl+C`, or if it's running in the background:
 ```bash
 kill $(lsof -ti :8532)
 ```
+
+Replacing the port number at need.
 
 ## ⚙️ Options and environment variables
 
@@ -205,8 +211,12 @@ cd api_tests/hermit_api_tests && npx --yes @usebruno/cli run --env hermit_env --
 
 ## 🐳 Docker
 
-See [DOCKER.md](DOCKER.md).
+See [docker.dev.md](docs/dev/docker.dev.md).
 
 ## 🏗️ Architecture
 
-See [docs/architecture.md](docs/architecture.md).
+See [architecture.dev.md](docs/dev/architecture.dev.md).
+
+## 📖 More docs
+
+See [docs/dev](docs/dev)

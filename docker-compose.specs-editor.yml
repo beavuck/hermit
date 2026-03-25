@@ -1,6 +1,8 @@
 services:
+
   api-editor-db:
     image: postgres:latest
+    pull_policy: always
     environment:
       POSTGRES_DB: "apicurio-registry"
       POSTGRES_USER: "apicurio-registry"
@@ -9,8 +11,10 @@ services:
       - "5432:5432"
     volumes:
       - api-editor-db-data:/var/lib/postgresql
+
   api-editor:
     image: apicurio/apicurio-registry:latest
+    pull_policy: always
     environment:
       apicurio.rest.deletion.group.enabled: "true"
       apicurio.rest.deletion.artifact.enabled: "true"
@@ -26,8 +30,10 @@ services:
       - "8080:8080"
     depends_on:
       - api-editor-db
+
   api-editor-ui:
     image: apicurio/apicurio-registry-ui:latest
+    pull_policy: always
     ports:
       - "8888:8080"
     depends_on:
