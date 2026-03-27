@@ -11,6 +11,9 @@ stages:
 
 variables:
   SCRIPT_TO_INSTALL_DEPS: "apk add --no-cache git bash curl jq && cargo install just"
+  X86_64_LINUX: "x86_64-unknown-linux-musl"
+  AARCH64_LINUX: "aarch64-unknown-linux-musl"
+  X86_64_WINDOWS: "x86_64-pc-windows-gnu"
 
 default:
   image: dhi.io/rust:1-alpine3.23-dev
@@ -151,13 +154,13 @@ build_hermit:
   parallel:
     matrix:
       - ARCH: amd64
-        RUST_TARGET: x86_64-unknown-linux-musl
+        RUST_TARGET: $X86_64_LINUX
         RUSTFLAGS: "-C target-feature=+crt-static"
       - ARCH: arm64
-        RUST_TARGET: aarch64-unknown-linux-musl
+        RUST_TARGET: $AARCH64_LINUX
         RUSTFLAGS: "-C target-feature=+crt-static"
       - ARCH: windows-amd64
-        RUST_TARGET: x86_64-pc-windows-gnu
+        RUST_TARGET: $X86_64_WINDOWS
         RUSTFLAGS: ""
   cache:
     key: "cargo-$CI_COMMIT_REF_SLUG-$RUST_TARGET"
@@ -182,49 +185,11 @@ build_hermit:
     - job: run_unit_tests
       optional: true
 
-run_performance_tests:
-  extends: .cargo_cache
-  image: rust:alpine
-  stage: test
-  script:
-    - cargo install just critcmp
-    - cargo install --locked cargo-nextest
-    - just bench-ci
-    - |
-      if [ -d criterion-baseline ]; then
-        cp -r criterion-baseline/. target/criterion/
-        critcmp main change --threshold 10
-      fi
-    - |
-      if [ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]; then
-        cp -r target/criterion criterion-baseline
-      fi
-  cache:
-    - key: "cargo-$CI_COMMIT_REF_SLUG"
-      paths:
-        - .cargo/registry/
-        - .cargo/git/
-        - target/
-    - key: "criterion-baseline"
-      paths:
-        - criterion-baseline/
-  artifacts:
-    expire_in: 1 week
-    paths:
-      - target/criterion/
-  rules:
-    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
-  needs:
-    - job: find_secrets
-      optional: true
-    - job: run_unit_tests
-      optional: true
-
 run_api_tests:
   stage: build
   image: node:lts-alpine
   script:
-    - ./target/x86_64-unknown-linux-musl/release/hermit --specs-dir specs_assets &
+    - ./target/$X86_64_LINUX/release/hermit --specs-dir specs_assets &
     - sleep 1
     - cd api_tests/hermit_api_tests && npx --yes @usebruno/cli run --env hermit_env --bail
   rules:
@@ -236,7 +201,8 @@ run_api_tests:
       parallel:
         matrix:
           - ARCH: amd64
-            RUST_TARGET: x86_64-unknown-linux-musl
+            RUST_TARGET: $X86_64_LINUX
+            RUSTFLAGS: "-C target-feature=+crt-static"
 
 publish_to_cargo:
   extends: .cargo_cache
@@ -265,15 +231,15 @@ release_hermit:
     - RELEASE_DESCRIPTION=$(bash scripts/list_changes.sh "$PREV_TAG" "$CI_COMMIT_TAG")
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        --upload-file target/x86_64-unknown-linux-musl/release/${CI_PROJECT_NAME} \
+        --upload-file target/$X86_64_LINUX/release/${CI_PROJECT_NAME} \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-amd64"
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        --upload-file target/aarch64-unknown-linux-musl/release/${CI_PROJECT_NAME} \
+        --upload-file target/$AARCH64_LINUX/release/${CI_PROJECT_NAME} \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-arm64"
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        --upload-file target/x86_64-pc-windows-gnu/release/${CI_PROJECT_NAME}.exe \
+        --upload-file target/$X86_64_WINDOWS/release/${CI_PROJECT_NAME}.exe \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-windows-amd64.exe"
   release:
     tag_name: "$CI_COMMIT_TAG"
