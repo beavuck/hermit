@@ -14,9 +14,10 @@ variables:
   X86_64_LINUX: "x86_64-unknown-linux-musl"
   AARCH64_LINUX: "aarch64-unknown-linux-musl"
   X86_64_WINDOWS: "x86_64-pc-windows-gnu"
+  IMAGE: rust:1-alpine3.23
 
 default:
-  image: dhi.io/rust:1-alpine3.23-dev
+  image: $IMAGE
   interruptible: true
 
 ########~~~~-- Workflows --~~~~########
@@ -46,7 +47,7 @@ include:
       branch_name: "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
       command: "just lint"
       commit_message: "🎨 Format code automatically"
-      image: "rust:alpine"
+      image: "$IMAGE"
       script_to_install_deps: "$SCRIPT_TO_INSTALL_DEPS"
       consecutive_command_commits_allowed: false
 
@@ -57,7 +58,7 @@ include:
       branch_name: "chore/upgrade-dependencies"
       command: "just upgrade-ci"
       commit_message: "⚙️ Upgrade dependencies automatically"
-      image: "rust:alpine"
+      image: "$IMAGE"
       script_to_install_deps: "$SCRIPT_TO_INSTALL_DEPS"
       consecutive_command_commits_allowed: true
 
@@ -98,6 +99,7 @@ publish_to_docker:
       - .cargo/
       - target/
   before_script:
+    - mkdir -p "$CARGO_HOME/bin"
     - export PATH="$CARGO_HOME/bin:$PATH"
 
 ########~~~~-- Jobs --~~~~########
@@ -106,11 +108,13 @@ run_unit_tests:
   extends: .cargo_cache
   stage: test
   script:
-    - apk add --no-cache llvm
+    - apk add --no-cache curl llvm
     - export LLVM_COV=$(command -v llvm-cov || ls /usr/bin/llvm-cov-* 2>/dev/null | head -1)
     - export LLVM_PROFDATA=$(command -v llvm-profdata || ls /usr/bin/llvm-profdata-* 2>/dev/null | head -1)
-    - cargo install just cargo-llvm-cov
-    - cargo install --locked cargo-nextest
+    - JUST_VERSION=$(curl -LsSf https://api.github.com/repos/casey/just/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+    - curl -LsSf "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar -xzf - -C "$CARGO_HOME/bin" just
+    - curl -LsSf "https://github.com/taiki-e/cargo-llvm-cov/releases/latest/download/cargo-llvm-cov-x86_64-unknown-linux-musl.tar.gz" | tar -xzf - -C "$CARGO_HOME/bin"
+    - curl -LsSf https://get.nexte.st/latest/linux-musl | tar -xzf - -C "$CARGO_HOME/bin"
     - just coverage-ci
   artifacts:
     expire_in: 1 day
@@ -168,9 +172,10 @@ build_hermit:
       - .cargo/
       - target/
   script:
-    - apk add --no-cache rustup zig
-    - rustup-init -y
-    - cargo install just cargo-zigbuild
+    - apk add --no-cache curl zig
+    - JUST_VERSION=$(curl -LsSf https://api.github.com/repos/casey/just/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+    - curl -LsSf "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar -xzf - -C "$CARGO_HOME/bin" just
+    - cargo install cargo-zigbuild
     - just build-release
   artifacts:
     expire_in: 1 day
@@ -207,7 +212,6 @@ run_api_tests:
 publish_to_cargo:
   extends: .cargo_cache
   stage: deploy
-  image: rust:alpine
   script:
     - CARGO_REGISTRY_TOKEN=$CARGO_TOKEN cargo publish
   rules:

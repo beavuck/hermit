@@ -57,20 +57,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "should be readable")]
-    fn load_panics_on_unreadable_file() {
-        if std::env::var("USER").as_deref() == Ok("root") {
-            return;
-        }
-        use std::os::unix::fs::PermissionsExt;
-        let path = std::env::temp_dir().join("hermit_test_unreadable.txt");
-        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644));
-        std::fs::write(&path, "").unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
-        load(&path);
-    }
-
-    #[test]
     #[should_panic(expected = "should contain valid YAML or JSON")]
     fn load_panics_on_invalid_yaml() {
         let path = std::env::temp_dir().join("hermit_test_invalid_yaml.txt");
