@@ -96,39 +96,47 @@ fn flatten_all_of(
         return merged;
     };
     let mut queue: VecDeque<Value> = items.iter().cloned().collect();
-
     while let Some(item) = queue.pop_front() {
-        let mut current = item;
-
-        loop {
-            match step_ref(&current, root, visiting) {
-                RefStep::Followed(v) => {
-                    current = v;
-                    continue;
-                }
-                RefStep::Stop => break,
-                RefStep::NotARef => {}
+        if let Some(props) = collect_properties_from_item(item, root, forced, visiting, &mut queue)
+        {
+            for (k, v) in props {
+                merged.insert(k, v);
             }
-
-            if let Some(inner_items) = current.get("allOf").and_then(|v| v.as_sequence()) {
-                queue.extend(inner_items.iter().cloned());
-                break;
-            }
-
-            if let Some(variant) = pick_composite_variant(&current, root, forced) {
-                current = variant;
-                continue;
-            }
-
-            if let Some(props) = current.get("properties").and_then(|v| v.as_mapping()) {
-                for (k, v) in props {
-                    merged.insert(k.clone(), v.clone());
-                }
-            }
-            break;
         }
     }
     merged
+}
+
+fn collect_properties_from_item(
+    item: Value,
+    root: &Value,
+    forced: Option<&str>,
+    visiting: &mut HashSet<String>,
+    queue: &mut VecDeque<Value>,
+) -> Option<yaml_serde::Mapping> {
+    let mut current = item;
+    loop {
+        match step_ref(&current, root, visiting) {
+            RefStep::Followed(v) => {
+                current = v;
+                continue;
+            }
+            RefStep::Stop => return None,
+            RefStep::NotARef => {}
+        }
+        if let Some(inner_items) = current.get("allOf").and_then(|v| v.as_sequence()) {
+            queue.extend(inner_items.iter().cloned());
+            return None;
+        }
+        if let Some(variant) = pick_composite_variant(&current, root, forced) {
+            current = variant;
+            continue;
+        }
+        return current
+            .get("properties")
+            .and_then(|v| v.as_mapping())
+            .cloned();
+    }
 }
 
 fn pick_composite_variant(schema: &Value, root: &Value, forced: Option<&str>) -> Option<Value> {
@@ -156,37 +164,42 @@ fn try_pick_forced(schema: &Value, root: &Value, forced_key: &str) -> Option<Val
 pub fn find_discriminator(schema: &Value, root: &Value) -> Option<(String, Vec<String>)> {
     let mut visiting = HashSet::new();
     let mut queue: VecDeque<Value> = VecDeque::from([schema.clone()]);
-
     while let Some(item) = queue.pop_front() {
-        let mut current = item;
-
-        loop {
-            match step_ref(&current, root, &mut visiting) {
-                RefStep::Followed(v) => {
-                    current = v;
-                    continue;
-                }
-                RefStep::Stop => break,
-                RefStep::NotARef => {}
-            }
-
-            for composite_key in &["oneOf", "anyOf"] {
-                if current.get(*composite_key).is_some()
-                    && let Some(info) = discriminator_info(&current)
-                {
-                    return Some(info);
-                }
-            }
-
-            if let Some(items) = current.get("allOf").and_then(|v| v.as_sequence()) {
-                queue.extend(items.iter().cloned());
-            }
-
-            break;
+        if let Some(info) = search_item_for_discriminator(item, root, &mut visiting, &mut queue) {
+            return Some(info);
         }
     }
-
     None
+}
+
+fn search_item_for_discriminator(
+    item: Value,
+    root: &Value,
+    visiting: &mut HashSet<String>,
+    queue: &mut VecDeque<Value>,
+) -> Option<(String, Vec<String>)> {
+    let mut current = item;
+    loop {
+        match step_ref(&current, root, visiting) {
+            RefStep::Followed(v) => {
+                current = v;
+                continue;
+            }
+            RefStep::Stop => return None,
+            RefStep::NotARef => {}
+        }
+        for composite_key in &["oneOf", "anyOf"] {
+            if current.get(*composite_key).is_some()
+                && let Some(info) = discriminator_info(&current)
+            {
+                return Some(info);
+            }
+        }
+        if let Some(items) = current.get("allOf").and_then(|v| v.as_sequence()) {
+            queue.extend(items.iter().cloned());
+        }
+        return None;
+    }
 }
 
 fn discriminator_info(schema: &Value) -> Option<(String, Vec<String>)> {

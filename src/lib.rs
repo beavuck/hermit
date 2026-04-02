@@ -1,3 +1,4 @@
+#![warn(clippy::cognitive_complexity)]
 pub mod cli;
 pub mod constants;
 pub mod http_method;

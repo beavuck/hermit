@@ -157,7 +157,7 @@ dependencies = [
 
 [[package]]
 name = "beavuck-hermit"
-version = "1.4.3"
+version = "1.4.4"
 dependencies = [
  "axum",
  "chrono",

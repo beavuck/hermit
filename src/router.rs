@@ -65,19 +65,8 @@ pub fn build(configs: Vec<RouteConfig>) -> Router {
 
 pub fn build_with_bounds(configs: Vec<RouteConfig>, min_items: usize, max_items: usize) -> Router {
     let mut by_path: HashMap<String, MethodRouter<Arc<AppState>>> = HashMap::new();
-
     for cfg in &configs {
-        let mr = match cfg.method {
-            HttpMethod::Get => axum::routing::get(handle_readonly),
-            HttpMethod::Delete => axum::routing::delete(handle_readonly),
-            HttpMethod::Options => axum::routing::options(handle_readonly),
-            HttpMethod::Head => axum::routing::head(handle_readonly),
-            HttpMethod::Trace => axum::routing::trace(handle_readonly),
-            HttpMethod::Post => axum::routing::post(handle_with_body),
-            HttpMethod::Put => axum::routing::put(handle_with_body),
-            HttpMethod::Patch => axum::routing::patch(handle_with_body),
-        };
-
+        let mr = method_router_for(&cfg.method);
         let path = cfg.axum_path.clone();
         by_path
             .entry(path)
@@ -92,12 +81,7 @@ pub fn build_with_bounds(configs: Vec<RouteConfig>, min_items: usize, max_items:
     let mut item_generators: HashMap<String, Arc<dyn Fn() -> serde_json::Value + Send + Sync>> =
         HashMap::new();
     for cfg in &configs {
-        if cfg.method == HttpMethod::Get && !is_item_pattern(&cfg.axum_path) {
-            collection_templates.insert(cfg.axum_path.clone(), extract_items_from_mock(&cfg.body));
-            if let Some(generator) = cfg.item_generator.clone() {
-                item_generators.insert(cfg.axum_path.clone(), generator);
-            }
-        }
+        register_collection_entry(cfg, &mut collection_templates, &mut item_generators);
     }
 
     let state = Arc::new(AppState {
@@ -114,6 +98,32 @@ pub fn build_with_bounds(configs: Vec<RouteConfig>, min_items: usize, max_items:
         router = router.route(&path, mr);
     }
     router.with_state(state)
+}
+
+fn method_router_for(method: &HttpMethod) -> MethodRouter<Arc<AppState>> {
+    match method {
+        HttpMethod::Get => axum::routing::get(handle_readonly),
+        HttpMethod::Delete => axum::routing::delete(handle_readonly),
+        HttpMethod::Options => axum::routing::options(handle_readonly),
+        HttpMethod::Head => axum::routing::head(handle_readonly),
+        HttpMethod::Trace => axum::routing::trace(handle_readonly),
+        HttpMethod::Post => axum::routing::post(handle_with_body),
+        HttpMethod::Put => axum::routing::put(handle_with_body),
+        HttpMethod::Patch => axum::routing::patch(handle_with_body),
+    }
+}
+
+fn register_collection_entry(
+    cfg: &RouteConfig,
+    collection_templates: &mut HashMap<String, Vec<serde_json::Value>>,
+    item_generators: &mut HashMap<String, Arc<dyn Fn() -> serde_json::Value + Send + Sync>>,
+) {
+    if cfg.method == HttpMethod::Get && !is_item_pattern(&cfg.axum_path) {
+        collection_templates.insert(cfg.axum_path.clone(), extract_items_from_mock(&cfg.body));
+        if let Some(generator) = cfg.item_generator.clone() {
+            item_generators.insert(cfg.axum_path.clone(), generator);
+        }
+    }
 }
 
 fn into_state_map(configs: Vec<RouteConfig>) -> HashMap<String, RouteConfig> {
