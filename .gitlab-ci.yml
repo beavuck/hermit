@@ -42,17 +42,6 @@ include:
 
   - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/command-runner/command-runner@main"
     inputs:
-      job_name: "format"
-      stage_config: ".pre"
-      branch_name: "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
-      command: "just lint"
-      commit_message: "🎨 Format code automatically"
-      image: "$IMAGE"
-      script_to_install_deps: "$SCRIPT_TO_INSTALL_DEPS"
-      consecutive_command_commits_allowed: false
-
-  - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/command-runner/command-runner@main"
-    inputs:
       job_name: "upgrade"
       stage_config: "upgrade"
       branch_name: "chore/upgrade-dependencies"
@@ -73,10 +62,6 @@ include:
 find_secrets:
   rules:
     - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
-    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
-
-format:
-  rules:
     - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
 
 upgrade:
@@ -175,7 +160,8 @@ build_hermit:
     - apk add --no-cache curl zig
     - JUST_VERSION=$(curl -LsSf https://api.github.com/repos/casey/just/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
     - curl -LsSf "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar -xzf - -C "$CARGO_HOME/bin" just
-    - cargo install cargo-zigbuild
+    - ZIGBUILD_VERSION=$(curl -LsSf https://api.github.com/repos/rust-cross/cargo-zigbuild/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+    - curl -LsSf "https://github.com/rust-cross/cargo-zigbuild/releases/download/${ZIGBUILD_VERSION}/cargo-zigbuild-x86_64-unknown-linux-musl.tar.xz" | tar -xJf - --strip-components=1 -C "$CARGO_HOME/bin" "cargo-zigbuild-x86_64-unknown-linux-musl/cargo-zigbuild"
     - just build-release
   artifacts:
     expire_in: 1 day
