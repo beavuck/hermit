@@ -2,12 +2,12 @@
 
 set -euo pipefail
 
-usage() {
-  echo "Usage: $0 [<from> [<to>]]" >&2
-  echo "  <from> and <to> can be tags, commits, SHAs, etc." >&2
-  echo "  Defaults to: last tag..HEAD (or first commit..HEAD if no tags)" >&2
-  exit 1
-}
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  echo "Usage: $0 [<from> [<to>]]"
+  echo "  <from> and <to> can be tags, commits, SHAs, etc. (if git log can handle it, so can this script)"
+  echo "  Defaults to: last tag..HEAD (or first commit..HEAD if no tags)"
+  exit 0
+fi
 
 if (( $# == 0 )); then
   mapfile -t tags < <(git for-each-ref \
@@ -30,8 +30,6 @@ elif (( $# == 2 )); then
   from=$1
   to=$2
 
-else
-  usage
 fi
 
 git --no-pager log "${from}..${to}" --pretty=format:'- %h %s'
