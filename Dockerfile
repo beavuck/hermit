@@ -1,9 +1,10 @@
 FROM --platform=$BUILDPLATFORM dhi.io/rust:1-alpine3.23-dev AS builder
 ARG TARGETARCH
 
-RUN apk add --no-cache rustup=1.29.0 zig=0.15.2 && rustup-init -y
 ENV PATH="/root/.cargo/bin:$PATH"
-RUN cargo install cargo-zigbuild \
+# https://github.com/rust-lang/rustup/tags and https://ziglang.org
+RUN apk add --no-cache rustup=1.29.0 zig=0.15.2 && rustup-init -y \
+    && cargo install cargo-zigbuild \
     && case "$TARGETARCH" in \
       amd64) echo "x86_64-unknown-linux-musl" ;; \
       arm64) echo "aarch64-unknown-linux-musl" ;; \
