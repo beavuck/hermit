@@ -75,6 +75,16 @@ publish_to_docker:
 
 ########~~~~-- Templates --~~~~########
 
+.install_glab:
+  before_script:
+    - |
+      GLAB_VERSION=$(curl -fsSL "https://gitlab.com/api/v4/projects/gitlab-org%2Fcli/releases?per_page=1" \
+        | grep -o '"tag_name":"[^"]*"' | head -1 | sed 's/.*:"\(.*\)"/\1/')
+      curl -fsSL "https://gitlab.com/gitlab-org/cli/-/releases/${GLAB_VERSION}/downloads/glab_${GLAB_VERSION#v}_linux_amd64.tar.gz" \
+        -o /tmp/glab.tar.gz
+      tar xzf /tmp/glab.tar.gz -C /tmp/
+      install -m755 /tmp/bin/glab /usr/local/bin/glab
+
 .cargo_cache:
   variables:
     CARGO_HOME: "$CI_PROJECT_DIR/.cargo"
@@ -206,7 +216,7 @@ publish_to_cargo:
 
 release_hermit:
   stage: deploy
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  image: "${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/debian:stable-slim"
   rules:
     - if: "$CI_COMMIT_TAG"
   needs:
@@ -215,7 +225,8 @@ release_hermit:
     - job: build_hermit
       artifacts: true
   before_script:
-    - apk add --no-cache curl git bash
+    - apt update -y && apt install -y curl git jq
+    - !reference [.install_glab, before_script]
   script:
     - PREV_TAG=$(git describe --tags --abbrev=0 "${CI_COMMIT_TAG}^")
     - RELEASE_DESCRIPTION=$(bash scripts/list_changes.sh "$PREV_TAG" "$CI_COMMIT_TAG")
@@ -231,23 +242,17 @@ release_hermit:
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
         --upload-file target/$X86_64_WINDOWS/release/${CI_PROJECT_NAME}.exe \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-windows-amd64.exe"
-  release:
-    tag_name: "$CI_COMMIT_TAG"
-    description: "$RELEASE_DESCRIPTION"
-    assets:
-      links:
-        - name: "linux-amd64-executable"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-amd64"
-          link_type: package
-        - name: "linux-arm64-executable"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-linux-arm64"
-          link_type: package
-        - name: "windows-amd64-executable"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${CI_COMMIT_TAG}/${CI_PROJECT_NAME}-windows-amd64.exe"
-          link_type: package
-        - name: "docker-image"
-          url: "https://hub.docker.com/repository/docker/beavuck/${CI_PROJECT_NAME}/tags?name=${CI_COMMIT_TAG}"
-          link_type: image
-        - name: "crates.io"
-          url: "https://crates.io/crates/beavuck-${CI_PROJECT_NAME}/${CI_COMMIT_TAG}"
-          link_type: package
+    - |
+      ASSET_LINKS=$(jq -n \
+        --arg name "$CI_PROJECT_NAME" \
+        --arg tag "$CI_COMMIT_TAG" \
+        --arg api "$CI_API_V4_URL" \
+        --arg pid "$CI_PROJECT_ID" \
+        '[
+          {"name":($name+"-linux-amd64"),"url":($api+"/projects/"+$pid+"/packages/generic/"+$name+"/"+$tag+"/"+$name+"-linux-amd64"),"link_type":"package"},
+          {"name":($name+"-linux-arm64"),"url":($api+"/projects/"+$pid+"/packages/generic/"+$name+"/"+$tag+"/"+$name+"-linux-arm64"),"link_type":"package"},
+          {"name":($name+"-windows-amd64.exe"),"url":($api+"/projects/"+$pid+"/packages/generic/"+$name+"/"+$tag+"/"+$name+"-windows-amd64.exe"),"link_type":"package"},
+          {"name":"docker-image","url":("https://hub.docker.com/repository/docker/beavuck/"+$name+"/tags?name="+$tag),"link_type":"image"},
+          {"name":"crates.io","url":("https://crates.io/crates/beavuck-"+$name+"/"+$tag),"link_type":"package"}
+        ]')
+      glab release create "$CI_COMMIT_TAG" --name "$CI_COMMIT_TAG" --notes "$RELEASE_DESCRIPTION" --assets-links "$ASSET_LINKS"
