@@ -1,6 +1,6 @@
 [package]
 name = "beavuck-hermit"
-version = "1.4.5"
+version = "1.4.6"
 edition = "2024"
 license = "Unlicense"
 repository = "https://gitlab.com/beavuck-services/hermit"
@@ -11,7 +11,7 @@ categories = ["command-line-utilities", "web-programming", "development-tools::t
 include = ["src/**/*", "README.md", "UNLICENSE", "PRIVACY.md", "docs/**/*"]
 
 [dependencies]
-tokio = { version = "1.51.0", features = ["macros", "net", "rt-multi-thread", "sync", "signal"] }
+tokio = { version = "1.51.1", features = ["macros", "net", "rt-multi-thread", "sync", "signal"] }
 axum = "0.8"
 tower-http = { version = "0.6.8", features = ["cors"] }
 serde_json = "1.0.149"
