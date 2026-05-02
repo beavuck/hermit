@@ -1,6 +1,6 @@
 [package]
 name = "beavuck-hermit"
-version = "1.4.8"
+version = "1.4.9"
 edition = "2024"
 license = "Unlicense"
 repository = "https://gitlab.com/beavuck-services/hermit"
