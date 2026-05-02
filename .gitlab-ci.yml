@@ -71,7 +71,6 @@ upgrade:
 publish_to_docker:
   rules:
     - if: "$CI_COMMIT_TAG"
-      when: manual
 
 ########~~~~-- Templates --~~~~########
 
@@ -212,7 +211,6 @@ publish_to_cargo:
     - CARGO_REGISTRY_TOKEN=$CARGO_TOKEN cargo publish
   rules:
     - if: "$CI_COMMIT_TAG"
-      when: manual
 
 release_hermit:
   stage: deploy
