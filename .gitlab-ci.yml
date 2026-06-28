@@ -35,10 +35,6 @@ workflow:
 ########~~~~-- Includes --~~~~########
 
 include:
-  - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/secret-finder/secret-finder@main"
-    inputs:
-      job_name: "find_secrets"
-      stage_config: "secure"
 
   - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/command-runner/command-runner@main"
     inputs:
@@ -58,11 +54,6 @@ include:
       image_name: "beavuck/${CI_PROJECT_NAME}"
       platforms: "linux/amd64,linux/arm64"
       publish_to_dockerhub: true
-
-find_secrets:
-  rules:
-    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
-    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
 
 upgrade:
   rules:
@@ -97,6 +88,14 @@ publish_to_docker:
     - export PATH="$CARGO_HOME/bin:$PATH"
 
 ########~~~~-- Jobs --~~~~########
+
+find_secrets:
+  image: ${CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX}/gitguardian/ggshield:latest
+  stage: secure
+  script: ggshield secret scan ci
+  rules:
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE != 'schedule'"
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
 
 run_unit_tests:
   extends: .cargo_cache
