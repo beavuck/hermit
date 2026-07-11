@@ -1,6 +1,6 @@
 [package]
 name = "beavuck-hermit"
-version = "1.4.17"
+version = "1.4.18"
 edition = "2024"
 license = "Unlicense"
 repository = "https://gitlab.com/beavuck-services/hermit"
@@ -26,7 +26,7 @@ mutants = "0.0.4"
 tower = { version = "0.5.3", features = ["util"] }
 http-body-util = "0.1.3"
 criterion = { version = "0.8.2", features = ["html_reports"] }
-regex = "1.12.4"
+regex = "1.13.0"
 
 [[bin]]
 name = "hermit"
