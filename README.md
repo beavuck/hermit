@@ -2,8 +2,8 @@
 
 [![docker](https://badgen.net/docker/pulls/beavuck/hermit) ![docker](https://badgen.net/docker/size/beavuck/hermit)](https://hub.docker.com/repository/docker/beavuck/hermit)
 
-Hermit is an OpenAPI mock server. Point it at a spec file, and it starts serving lightning-fast
-schema-accurate responses out of the box -- no stubs to write, sensible defaults, configurable.
+Hermit is an OpenAPI mock server. Pass it the path to a spec file, and it starts serving lightning-fast
+schema-accurate responses out of the box. No stubs to write, sensible defaults, configurable.
 
 ## 📊 Status
 
