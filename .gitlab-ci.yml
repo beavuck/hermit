@@ -47,7 +47,7 @@ include:
       script_to_install_deps: "$SCRIPT_TO_INSTALL_DEPS"
       consecutive_command_commits_allowed: true
 
-  - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/docker-publisher/docker-publisher@1.4.1"
+  - component: "$CI_SERVER_FQDN/beavuck-services/ci-cd-catalog/docker-publisher/docker-publisher@main"
     inputs:
       job_name: "publish_to_docker"
       stage_config: "deploy"
