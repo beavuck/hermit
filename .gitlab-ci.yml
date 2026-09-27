@@ -53,7 +53,7 @@ include:
       stage_config: "deploy"
       image_name: "beavuck/${CI_PROJECT_NAME}"
       platforms: "linux/amd64,linux/arm64"
-      build_args: "provenance=false"
+      provenance: false
       publish_to_dockerhub: true
 
 upgrade:
