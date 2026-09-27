@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM dhi.io/rust:1-alpine3.23-dev AS builder
+FROM --platform=$BUILDPLATFORM dhi.io/rust:1-alpine3.24-dev AS builder
 ARG TARGETARCH
 
 ENV PATH="/root/.cargo/bin:$PATH"
