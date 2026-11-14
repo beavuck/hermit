@@ -14,7 +14,7 @@ impl std::str::FromStr for CorsOrigins {
             Ok(CorsOrigins::All)
         } else {
             Ok(CorsOrigins::List(
-                s.split(',').map(|o| o.to_string()).collect(),
+                s.split(',').map(str::to_string).collect(),
             ))
         }
     }

@@ -15,7 +15,7 @@ pub enum HttpMethod {
 
 #[cfg_attr(test, mutants::skip)] // not tested
 impl HttpMethod {
-    pub const ALL: &'static [Self] = &[
+    pub const ALL: &[Self] = &[
         Self::Get,
         Self::Post,
         Self::Put,
